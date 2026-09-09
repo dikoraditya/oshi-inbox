@@ -1,0 +1,17 @@
+node_modules/
+.next/
+out/
+.env
+.env.local
+*.tsbuildinfo
+next-env.d.ts
+
+# reverse-engineering captures — contain tokens + private messages, never commit
+*.har
+
+# The collector is its own repo (oshi-inbox-collector).
+collector/
+
+# scratch/diagnostic scripts
+_*.ts
+_*.mjs
