@@ -1,10 +1,9 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 
-import { initialsOf, unreadLabel } from "@/lib/text";
+import { initialsOf } from "@/lib/text";
 import { SOURCES, type Member, type Message } from "@/lib/types";
-import type { CosmFetchSummary } from "@/lib/store";
 
 /** "All" is a sentinel, not a real group/source. */
 export type GroupFilter = string;
@@ -49,8 +48,6 @@ export function InboxView({
   onSourceFilter,
   onOpen,
   onOpenUnassigned,
-  onFetchAll,
-  onSyncApps,
 }: {
   members: Member[];
   messages: Message[];
@@ -64,10 +61,6 @@ export function InboxView({
   onSourceFilter: (value: SourceFilter) => void;
   onOpen: (memberId: string) => void;
   onOpenUnassigned: (messageId: string) => void;
-  /** Present only when COSM members exist; triggers a server-side pull of all rooms. */
-  onFetchAll?: () => Promise<CosmFetchSummary>;
-  /** Queue the browser-driven sources (Weverse/Nogizaka) on the local collector. */
-  onSyncApps?: () => Promise<void>;
 }) {
   /** Latest message per member, for the one-line preview. */
   const latest = useMemo(() => {
@@ -96,73 +89,35 @@ export function InboxView({
     );
   }, [members, groupFilter, sourceFilter, query]);
 
-  /** Bucket by group, in the database's order, dropping empty buckets. */
-  const buckets = useMemo(
+  /** Every started thread, ordered purely by latest-message date — no group buckets. */
+  const threads = useMemo(
     () =>
-      groups
-        .map((group) => {
-          // Most recently active member first, matching a messaging inbox.
-          const rows = filtered
-            .filter((member) => member.group === group)
-            .sort((a, b) => (latest.get(b.id)?.createdAt ?? 0) - (latest.get(a.id)?.createdAt ?? 0));
-          return {
-            group,
-            rows,
-            unread: rows.reduce((total, member) => total + member.unread, 0),
-          };
-        })
-        .filter((bucket) => bucket.rows.length > 0),
-    [filtered, groups, latest],
+      filtered
+        .filter((member) => latest.has(member.id))
+        .sort((a, b) => (latest.get(b.id)?.createdAt ?? 0) - (latest.get(a.id)?.createdAt ?? 0)),
+    [filtered, latest],
   );
 
-  const totalUnread = members.reduce((total, member) => total + member.unread, 0);
-
-  const [fetching, setFetching] = useState(false);
-  const [fetchNote, setFetchNote] = useState<string | null>(null);
-
-  async function runFetchAll() {
-    if (!onFetchAll) return;
-    setFetching(true);
-    setFetchNote(null);
-    try {
-      const result = await onFetchAll();
-      setFetchNote(result.inserted > 0 ? `+${result.inserted} new` : "Up to date");
-    } catch (error) {
-      setFetchNote(error instanceof Error ? error.message : "Fetch failed");
-    } finally {
-      setFetching(false);
-    }
-  }
-
-  async function runSyncApps() {
-    if (!onSyncApps) return;
-    setFetchNote(null);
-    try {
-      await onSyncApps();
-      setFetchNote("Weverse/Nogizaka queued — they'll appear shortly");
-    } catch (error) {
-      setFetchNote(error instanceof Error ? error.message : "Could not queue");
-    }
-  }
+  /** Members with no message yet — parked at the very bottom, below every thread. */
+  const emptyMembers = useMemo(() => {
+    const order: Record<string, number> = Object.fromEntries(
+      groups.map((group, index) => [group, index]),
+    );
+    return filtered
+      .filter((member) => !latest.has(member.id))
+      .sort(
+        (a, b) =>
+          (order[a.group] ?? Infinity) - (order[b.group] ?? Infinity) ||
+          a.name.localeCompare(b.name),
+      );
+  }, [filtered, groups, latest]);
 
   return (
     <>
       <div className="inbox-head">
         <div className="inbox-titlerow">
           <h1 className="inbox-title">Inbox</h1>
-          <div className="inbox-unread">{totalUnread} unread</div>
-          {onFetchAll && (
-            <button type="button" className="btn-fetch" disabled={fetching} onClick={runFetchAll}>
-              {fetching ? "Fetching…" : "Fetch"}
-            </button>
-          )}
-          {onSyncApps && (
-            <button type="button" className="btn-fetch btn-fetch--ghost" onClick={runSyncApps}>
-              Sync apps
-            </button>
-          )}
         </div>
-        {fetchNote && <div className="inbox-fetchnote">{fetchNote}</div>}
 
         <input
           className="input input--search"
@@ -240,46 +195,64 @@ export function InboxView({
           </section>
         )}
 
-        {buckets.map((bucket) => (
-          <section key={bucket.group}>
-            <div className="grouphead">
-              <div className="kicker">{bucket.group}</div>
-              <div className="meta">{bucket.unread} unread</div>
-            </div>
-
-            {bucket.rows.map((member) => {
-              const preview = latest.get(member.id);
-              return (
-                <button
-                  key={member.id}
-                  type="button"
-                  className="row"
-                  onClick={() => onOpen(member.id)}
-                >
-                  <Avatar member={member} />
-                  <div className="row-body">
-                    <div className="row-top">
-                      <div className="row-name">{member.name}</div>
-                      <div className="row-spacer" />
-                      <div className="row-time">{preview?.time ?? ""}</div>
-                    </div>
-                    <div className="row-badges">
-                      <div className="badge-source">{member.source}</div>
-                      {member.unread > 0 && (
-                        <div className="badge-unread">{unreadLabel(member.unread)}</div>
-                      )}
-                    </div>
-                    <div className="row-preview" lang="ja">
-                      {previewText(preview)}
-                    </div>
+        <section>
+          {threads.map((member) => {
+            const preview = latest.get(member.id);
+            return (
+              <button
+                key={member.id}
+                type="button"
+                className="row"
+                onClick={() => onOpen(member.id)}
+              >
+                <Avatar member={member} />
+                <div className="row-body">
+                  <div className="row-top">
+                    <div className="row-name">{member.name}</div>
+                    <div className="row-spacer" />
+                    <div className="row-time">{preview?.time ?? ""}</div>
                   </div>
-                </button>
-              );
-            })}
-          </section>
-        ))}
+                  <div className="row-badges">
+                    <div className="badge-source">{member.source}</div>
+                  </div>
+                  <div className="row-preview" lang="ja">
+                    {previewText(preview)}
+                  </div>
+                </div>
+              </button>
+            );
+          })}
+        </section>
 
-        {buckets.length === 0 && unassigned.length === 0 && (
+        {emptyMembers.length > 0 && (
+          <section>
+            <div className="grouphead">
+              <div className="kicker">No messages yet</div>
+              <div className="meta">{emptyMembers.length}</div>
+            </div>
+            {emptyMembers.map((member) => (
+              <button
+                key={member.id}
+                type="button"
+                className="row"
+                onClick={() => onOpen(member.id)}
+              >
+                <Avatar member={member} />
+                <div className="row-body">
+                  <div className="row-top">
+                    <div className="row-name">{member.name}</div>
+                  </div>
+                  <div className="row-badges">
+                    <div className="badge-source">{member.source}</div>
+                  </div>
+                  <div className="row-preview row-preview--muted">No messages yet</div>
+                </div>
+              </button>
+            ))}
+          </section>
+        )}
+
+        {threads.length === 0 && unassigned.length === 0 && emptyMembers.length === 0 && (
           <div className="empty">No messages match those filters.</div>
         )}
 

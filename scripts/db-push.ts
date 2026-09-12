@@ -8,10 +8,10 @@
  */
 
 import { readFileSync } from "node:fs";
-import { neon } from "@neondatabase/serverless";
 import "dotenv/config";
 
 import { buildSeedMessages, MEMBERS } from "../src/lib/seed";
+import { createSql } from "../src/lib/server/sql";
 import { GROUP_ORDER } from "../src/lib/types";
 
 const url = process.env.DATABASE_URL;
@@ -20,7 +20,7 @@ if (!url) {
   process.exit(1);
 }
 
-const sql = neon(url);
+const sql = createSql();
 const schema = readFileSync(new URL("../db/schema.sql", import.meta.url), "utf8");
 
 // The HTTP driver takes one statement per round trip, so split the file rather

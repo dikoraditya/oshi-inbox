@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, type CSSProperties, type ReactNode } from "react";
+import { useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
 
 import { MessagePhoto } from "./MessagePhoto";
 import { segment, splitJp, splitLatin } from "@/lib/text";
@@ -280,6 +280,10 @@ export function ThreadView({
   const [fetching, setFetching] = useState(false);
   const [fetchNote, setFetchNote] = useState<string | null>(null);
 
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const jumpToBottom = () =>
+    scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
+
   async function runFetch() {
     if (!onFetch) return;
     setFetching(true);
@@ -353,6 +357,7 @@ export function ThreadView({
 
       <div
         className="scroll thread-scroll"
+        ref={scrollRef}
         // Tapping empty space dismisses an open gloss, matching the canvas.
         onClick={() => setOpenWord(null)}
       >
@@ -379,6 +384,16 @@ export function ThreadView({
       </div>
 
       <div className="viewfoot">Read-only. Reply from {member.source}.</div>
+
+      <button
+        type="button"
+        className="jump-bottom"
+        aria-label="Jump to the bottom"
+        title="Jump to the bottom"
+        onClick={jumpToBottom}
+      >
+        ↓
+      </button>
     </>
   );
 }

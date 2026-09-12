@@ -88,7 +88,7 @@ export function RosterView({
   return (
     <>
       <div className="roster-head">
-        <h1 className="inbox-title">Roster</h1>
+        <h1 className="inbox-title">Idol</h1>
         <div className="roster-sub">Groups and members you follow</div>
       </div>
 

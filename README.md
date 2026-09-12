@@ -37,6 +37,30 @@ Leave `APP_PASSWORD` empty locally and the passphrase gate stays off. **Always
 set it on a deployment** — the app is a single public URL with your messages
 behind it.
 
+### Running fully local (no cloud accounts)
+
+The app runs against cloud services (Neon Postgres + Vercel Blob) or entirely on
+your own machine — pick per environment with two env vars, both auto-detected:
+
+- **Database.** Point `DATABASE_URL` at a local Postgres
+  (`postgres://postgres:postgres@localhost:5432/oshi`) and it uses the
+  node-postgres driver automatically; a Neon URL uses Neon's HTTP driver. Force
+  either with `DB_DRIVER=pg` / `DB_DRIVER=neon`. `npm run db:push` and the seed
+  scripts follow the same selection.
+- **Media (pics + videos).** With no `BLOB_READ_WRITE_TOKEN`, attachments and
+  ingested images/videos are written to `public/media/` on disk and served as
+  static files — free and unbounded, with full `<video>` playback. Set
+  `MEDIA_STORAGE=local` to force disk even when a Blob token is present,
+  `MEDIA_STORAGE=blob` on Vercel (whose filesystem is read-only), or
+  `MEDIA_STORAGE=both` to mirror every file to Blob **and** disk for redundancy.
+  In `both` mode `MEDIA_PRIMARY` (default `blob`) picks which copy's URL is
+  stored on the row and served; the other is a backup, and each write is
+  best-effort so one backend failing never drops the media. `MEDIA_DIR`
+  overrides the folder. `public/media/` is git-ignored.
+
+So a zero-cloud local run needs only a local Postgres and `ANTHROPIC_API_KEY`;
+leave the Blob and Vercel vars blank.
+
 ---
 
 ## How it works

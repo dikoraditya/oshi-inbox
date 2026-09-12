@@ -1,12 +1,12 @@
 "use client";
 
-export type TabKey = "inbox" | "thread" | "capture" | "roster";
+export type TabKey = "inbox" | "thread" | "statistics" | "roster";
 
 const TABS: Array<{ key: TabKey; label: string }> = [
   { key: "inbox", label: "Inbox" },
   { key: "thread", label: "Reading" },
-  { key: "capture", label: "Capture" },
-  { key: "roster", label: "Roster" },
+  { key: "statistics", label: "Stats" },
+  { key: "roster", label: "Idol" },
 ];
 
 /**

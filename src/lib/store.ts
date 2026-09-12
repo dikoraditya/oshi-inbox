@@ -262,11 +262,6 @@ export function useInbox() {
     [refresh],
   );
 
-  /** Ask the local collector (via its poll loop) to fetch a browser source. */
-  const queueCollector = useCallback(async (source: string): Promise<void> => {
-    await api("/api/collector/queue", { method: "POST", body: JSON.stringify({ source }) });
-  }, []);
-
   /** Roster: add a member. New members show in the inbox immediately, with no entries. */
   const addMember = useCallback(
     async (input: { name: string; group: string; source: Source }): Promise<Member> => {
@@ -328,7 +323,6 @@ export function useInbox() {
     retranslate,
     markRead,
     fetchSources,
-    queueCollector,
     updateSettings,
   };
 }

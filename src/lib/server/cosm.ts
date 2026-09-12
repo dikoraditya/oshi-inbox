@@ -2,7 +2,8 @@ import "server-only";
 
 import type { NormalizedMessage } from "@/lib/ingest";
 import type { MediaType, Source } from "@/lib/types";
-import { readState, writeState } from "./db";
+import { memberForKey, readState, updateMember, writeState } from "./db";
+import { storeMedia } from "./media";
 
 /**
  * Server-side COSM LINK fetch, so the app can pull =LOVE/≠ME/≒JOY on demand
@@ -14,7 +15,9 @@ import { readState, writeState } from "./db";
  * way to pull the browser-driven sources; keep the room→member tables in sync.
  */
 
-const AUTH_BASE = "https://api.entertainment-platform-auth.cosm.jp";
+// COSM migrated auth to a Connect-RPC endpoint on the `api.backend.` host; the
+// old `api.` REST `/login` now edge-403s. Login is protobuf + a verification key.
+const AUTH_BASE = "https://api.backend.entertainment-platform-auth.cosm.jp";
 const API_BASE = "https://v3.api.equal-love.link.cosm.jp";
 
 /** app_state key holding the per-room watermark (newest message id seen). */
@@ -52,8 +55,8 @@ export const COSM_GROUPS: Record<string, CosmGroup> = {
   },
   "nearly-equal-joy": {
     key: "nearly-equal-joy",
-    group: "niajoy",
-    source: "niajoy Talk",
+    group: "≒JOY",
+    source: "≒JOY LINK",
     userAgent: "io.cosm.fc.user.nearly.equal.joy/1.3.11/Android/12/SM-S916U",
     rooms: {
       45: "逢田珠里依", 46: "天野香乃愛", 47: "市原愛弓", 48: "江角怜音", 49: "大信田美月",
@@ -106,6 +109,9 @@ interface CosmMessage {
   postedDate?: number | string;
   postedUsername?: string;
   chatMedia?: CosmMedia[];
+  postedUserProfileUrl?: string;
+  postedUserIconUrl?: string;
+  isMine?: boolean;
 }
 
 interface ChatPage {
@@ -124,19 +130,91 @@ function headers(userAgent: string, uuid: string, token?: string): Record<string
   };
 }
 
+/** Protobuf varint encoder (little-endian base-128). */
+function encodeVarint(value: number): number[] {
+  const out: number[] = [];
+  let v = value;
+  do {
+    const byte = v & 0x7f;
+    v >>>= 7;
+    out.push(v ? byte | 0x80 : byte);
+  } while (v);
+  return out;
+}
+
+/** Encode a length-delimited (wire type 2) protobuf string field. */
+function encodeStringField(fieldNumber: number, value: string): number[] {
+  const bytes = Buffer.from(value, "utf8");
+  return [...encodeVarint((fieldNumber << 3) | 2), ...encodeVarint(bytes.length), ...bytes];
+}
+
+/** Read a protobuf varint; returns [value, nextOffset]. */
+function readVarint(data: Uint8Array, offset: number): [number, number] {
+  let result = 0;
+  let shift = 0;
+  let o = offset;
+  for (;;) {
+    const byte = data[o];
+    o += 1;
+    result |= (byte & 0x7f) << shift;
+    if (!(byte & 0x80)) break;
+    shift += 7;
+  }
+  return [result, o];
+}
+
+/** Pull field 1 (accessToken) out of the protobuf LoginResponse. */
+function decodeAccessToken(data: Uint8Array): string | null {
+  let offset = 0;
+  let token: string | null = null;
+  while (offset < data.length) {
+    const [tag, afterTag] = readVarint(data, offset);
+    offset = afterTag;
+    const field = tag >>> 3;
+    const wire = tag & 0x07;
+    if (wire === 2) {
+      const [len, afterLen] = readVarint(data, offset);
+      const end = afterLen + len;
+      if (field === 1) token = Buffer.from(data.subarray(afterLen, end)).toString("utf8");
+      offset = end;
+    } else if (wire === 0) {
+      offset = readVarint(data, offset)[1];
+    } else if (wire === 1) {
+      offset += 8;
+    } else if (wire === 5) {
+      offset += 4;
+    } else {
+      break;
+    }
+  }
+  return token;
+}
+
 async function login(group: CosmGroup, uuid: string): Promise<string> {
-  const res = await fetch(`${AUTH_BASE}/login`, {
+  const rvk = process.env.COSM_REQUEST_VERIFICATION_KEY?.trim();
+  if (!rvk) {
+    throw new Error(
+      "COSM_REQUEST_VERIFICATION_KEY is not set — copy the x-request-verification-key header from the LINK web portal (DevTools → Network).",
+    );
+  }
+  const body = Buffer.from([
+    ...encodeStringField(1, process.env.COSM_USERNAME ?? ""),
+    ...encodeStringField(2, process.env.COSM_PASSWORD ?? ""),
+  ]);
+  const res = await fetch(`${AUTH_BASE}/auth.v1.AuthService/Login`, {
     method: "POST",
-    headers: { ...headers(group.userAgent, uuid), "Content-Type": "application/json" },
-    body: JSON.stringify({
-      username: process.env.COSM_USERNAME,
-      password: process.env.COSM_PASSWORD,
-    }),
+    headers: {
+      "User-Agent": group.userAgent,
+      "Accept-Language": "ja",
+      "Content-Type": "application/proto",
+      "Connect-Protocol-Version": "1",
+      "X-Artist-Group-UUID": uuid,
+      "X-Request-Verification-Key": rvk,
+    },
+    body,
   });
   if (!res.ok) throw new Error(`cosm login ${res.status}`);
-  const body = (await res.json()) as { result?: boolean; message?: string; data?: { accessToken?: string } };
-  if (!body.result) throw new Error(`cosm login rejected: ${body.message ?? "unknown"}`);
-  const token = body.data?.accessToken;
+  const token = decodeAccessToken(new Uint8Array(await res.arrayBuffer()));
   if (!token) throw new Error("cosm login returned no accessToken");
   return token;
 }
@@ -251,13 +329,7 @@ function mapMessages(group: CosmGroup, roomId: number, decoded: CosmMessage[]): 
 export async function collectRooms(roomIds: number[]): Promise<NormalizedMessage[]> {
   if (!isConfigured()) throw new Error("COSM_USERNAME / COSM_PASSWORD are not set.");
 
-  // Group the requested rooms by their owning group so we log in once each.
-  const byGroup: Record<string, number[]> = {};
-  for (const id of roomIds) {
-    const group = groupForRoom(id);
-    if (!group) continue;
-    (byGroup[group.key] ??= []).push(id);
-  }
+  const byGroup = roomsByGroup(roomIds);
 
   const watermark = (await readState<Record<string, string>>(WATERMARK_KEY)) ?? {};
   const out: NormalizedMessage[] = [];
@@ -271,10 +343,52 @@ export async function collectRooms(roomIds: number[]): Promise<NormalizedMessage
       const wmKey = `cosm:${roomId}`;
       const { messages, newestId } = await fetchRoom(group, uuid, token, roomId, watermark[wmKey] ?? null);
       out.push(...mapMessages(group, roomId, messages));
+      try {
+        await backfillAvatar(group, uuid, token, roomId, messages);
+      } catch (error) {
+        console.error(`[cosm] avatar backfill failed for room ${roomId}`, error);
+      }
       if (newestId) watermark[wmKey] = newestId;
     }
   }
 
   await writeState(WATERMARK_KEY, watermark);
   return out;
+}
+
+/** Group requested rooms by their owning COSM group (so we log in once each). */
+function roomsByGroup(roomIds: number[]): Record<string, number[]> {
+  const byGroup: Record<string, number[]> = {};
+  for (const id of roomIds) {
+    const group = groupForRoom(id);
+    if (group) (byGroup[group.key] ??= []).push(id);
+  }
+  return byGroup;
+}
+
+/**
+ * Capture a member's profile image once. COSM only exposes it inside chat
+ * (`postedUserProfileUrl`, a signed ~15-min GCS link), so download and store it
+ * durably the first time we see the room, then stop. Never throws to the caller.
+ */
+async function backfillAvatar(
+  group: CosmGroup,
+  uuid: string,
+  token: string,
+  roomId: number,
+  sampled: CosmMessage[],
+): Promise<void> {
+  const member = await memberForKey(`cosm:${roomId}`);
+  if (!member || member.avatarUrl) return;
+  let src = sampled.find((m) => !m.isMine && m.postedUserProfileUrl)?.postedUserProfileUrl;
+  if (!src) {
+    const { messages } = await fetchRoom(group, uuid, token, roomId, null, 1);
+    src = messages.find((m) => !m.isMine && m.postedUserProfileUrl)?.postedUserProfileUrl;
+  }
+  if (!src) return;
+  const res = await fetch(src);
+  if (!res.ok) return;
+  const contentType = res.headers.get("content-type") || "image/jpeg";
+  const url = await storeMedia(`cosm-avatar/${roomId}.jpg`, await res.arrayBuffer(), contentType);
+  await updateMember(member.id, { avatarUrl: url });
 }

@@ -1,10 +1,12 @@
 import "server-only";
 
-import { put } from "@vercel/blob";
 import { google, type gmail_v1 } from "googleapis";
+
+import { storeMedia } from "./media";
 
 import {
   insertIngested,
+  listMembers,
   memberForSender,
   readState,
   writeState,
@@ -182,7 +184,18 @@ interface ParsedMail {
   fromName: string;
   text: string;
   time: string;
+  /** Epoch ms the mail was received — its real send time, stored as createdAt. */
+  receivedAt: number;
   image: { data: Buffer; mimeType: string } | null;
+}
+
+/** Same terse clock/date the collector's sources use: today → HH:MM, else "Mon D". */
+function displayTime(epochMs: number, now = Date.now()): string {
+  const d = new Date(epochMs);
+  if (new Date(now).toDateString() === d.toDateString()) {
+    return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+  }
+  return `${d.toLocaleString("en-US", { month: "short" })} ${d.getDate()}`;
 }
 
 function header(payload: gmail_v1.Schema$MessagePart | undefined, name: string): string {
@@ -306,11 +319,8 @@ async function parseMail(
     fromEmail: from.email,
     fromName: from.name || from.email,
     text,
-    time: new Date(received).toLocaleTimeString([], {
-      hour: "2-digit",
-      minute: "2-digit",
-      hour12: false,
-    }),
+    time: displayTime(received),
+    receivedAt: received,
     image: image,
   };
 }
@@ -322,16 +332,11 @@ const INGEST_SOURCE: Source = "Mobile Mail";
 const LONG_THRESHOLD = 90;
 
 async function storeImage(messageId: string, image: NonNullable<ParsedMail["image"]>) {
-  if (!process.env.BLOB_READ_WRITE_TOKEN) return null;
   const extension = image.mimeType.split("/")[1]?.split("+")[0] || "jpg";
   try {
-    const blob = await put(`mail/${messageId}.${extension}`, image.data, {
-      access: "public",
-      contentType: image.mimeType,
-    });
-    return blob.url;
+    return await storeMedia(`mail/${messageId}.${extension}`, image.data, image.mimeType);
   } catch (error) {
-    console.error("[gmail] blob upload failed", error);
+    console.error("[gmail] media store failed", error);
     return null;
   }
 }
@@ -357,11 +362,11 @@ async function ingestOne(gmail: gmail_v1.Gmail, messageId: string): Promise<Mess
     en: "",
     words: [],
     time: mail.time,
-    source: member?.source ?? INGEST_SOURCE,
+    source: INGEST_SOURCE,
     imageUrl,
     long: mail.text.length > LONG_THRESHOLD,
     status: "pending",
-    createdAt: Date.now(),
+    createdAt: mail.receivedAt,
     gmailMessageId: mail.gmailMessageId,
     fromEmail: mail.fromEmail,
     fromName: mail.fromName,
@@ -452,4 +457,61 @@ export async function ingestSince(notifiedHistoryId?: string): Promise<IngestRes
 async function currentHistoryId(gmail: gmail_v1.Gmail): Promise<string | null> {
   const { data } = await gmail.users.getProfile({ userId: "me" });
   return data.historyId ? String(data.historyId) : null;
+}
+
+/* ── label-free listen mode ──────────────────────────────────────────────── */
+
+/** Every learned sender address across the roster — the listen allow-list. */
+export async function senderAllowList(): Promise<string[]> {
+  const members = await listMembers();
+  const set = new Set<string>();
+  for (const member of members) {
+    for (const email of member.emailAddresses) {
+      if (email) set.add(email.toLowerCase());
+    }
+  }
+  return [...set];
+}
+
+/**
+ * Pull recent mail straight from the registered senders — no Gmail label or
+ * filter required.
+ *
+ * Builds a `from:(a OR b …) newer_than:Nd` query from the roster's learned
+ * addresses, so registering a sender via /api/gmail/listen is all it takes to
+ * start receiving them. Attribution is by sender, exactly as the label path, and
+ * the unique `gmail_message_id` keeps re-scans idempotent.
+ */
+export async function ingestListenedSenders(opts?: {
+  newerThanDays?: number;
+  max?: number;
+  /** Restrict to a single already-registered sender — a per-idol backfill. */
+  from?: string;
+}): Promise<IngestResult> {
+  const registered = await senderAllowList();
+  const only = opts?.from?.trim().toLowerCase();
+  const addresses = only ? registered.filter((a) => a === only) : registered;
+  if (!addresses.length) return { inserted: [], scanned: 0, usedFallback: false };
+
+  const gmail = await gmailClient();
+  const window = opts?.newerThanDays ?? 7;
+  const q = `from:(${addresses.join(" OR ")}) newer_than:${window}d`;
+
+  const { data } = await gmail.users.messages.list({
+    userId: "me",
+    q,
+    maxResults: opts?.max ?? 50,
+  });
+
+  const inserted: Message[] = [];
+  for (const message of data.messages ?? []) {
+    if (!message.id) continue;
+    try {
+      const stored = await ingestOne(gmail, message.id);
+      if (stored) inserted.push(stored);
+    } catch (error) {
+      console.error(`[gmail] listen ingest failed ${message.id}`, error);
+    }
+  }
+  return { inserted, scanned: data.messages?.length ?? 0, usedFallback: false };
 }

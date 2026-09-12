@@ -37,14 +37,31 @@ One inbox for idol DMs across platforms, with JP / romaji / English aligned.
 - Nogizaka `%%%` fan-name placeholder is substituted with `FAN_NICKNAME` (set to "Diko").
 - Collector ingest is resilient: dedupe **before** the media copy, small batches + retry,
   per-page watermark persistence, newest-first bounded Weverse paging.
+- **One member per (idol, method).** An idol reachable on several apps — e.g.
+  Ito Momoka and Mizuki Yamauchi on Weverse DM *and* AKB Mobile Mail — is a
+  separate member per source, so the inbox and Statistics list the two apart.
+  `resolveOrCreateMemberByEmail` only name-matches within the same source, so
+  registering a mobame sender never merges into someone's Weverse member.
+  Per-sender mobame backfill: `POST /api/gmail/sync { from, days, max }`.
+- **Mobame carry their real send time.** Gmail ingest stores the mail's
+  `internalDate` as `createdAt` (not ingest time), so inbox/threads sort by when
+  a message was actually sent and each row shows its date (HH:MM today, else
+  "Mon D") — matching the collector sources.
 
 ## Known issues / next steps
-1. **Media storage cap.** Vercel Blob free tier = **1 GB**, and it's full (videos), so
-   ~227 Nogizaka messages have media that couldn't be stored → they render blank.
-   Options: (a) switch `storeImage` (`src/lib/server/ingest.ts`) to save under a local
-   folder like `public/media/` — free + unlimited for local use, full playback; or
-   (b) upgrade Vercel Blob to Pro. **Decision deferred.** If going local-disk: change
-   `storeImage`, then delete the blank rows + reset the Nogizaka watermark + re-collect.
+1. **Media storage — resolved (local disk option).** `storeImage` now goes
+   through `src/lib/server/media.ts` (`storeMedia`), which writes to
+   `public/media/` on disk when `MEDIA_STORAGE=local` or no `BLOB_READ_WRITE_TOKEN`
+   is set — free + unlimited for local use, full image/video playback (static
+   serving answers HTTP range requests, so `<video>` scrubbing works). Set
+   `MEDIA_STORAGE=blob` on Vercel, or `MEDIA_STORAGE=both` to mirror to Blob +
+   disk (canonical copy chosen by `MEDIA_PRIMARY`, default `blob`). To reclaim
+   the ~227 Nogizaka rows that went
+   blank against the full 1 GB Blob: switch to local, delete those blank rows +
+   reset the Nogizaka watermark (collector `state.json`) + re-collect. The app
+   also runs against a local Postgres now (`DB_DRIVER=pg` or a localhost
+   `DATABASE_URL`), so a fully cloud-free local run needs only Postgres +
+   `ANTHROPIC_API_KEY`.
 2. **COSM** unreachable from non-Japan networks (TCP blocked). Works when the app is
    deployed / on an allowed network.
 3. **Weverse video/audio** are poster-only — Weverse gives only a `videoId`, no stream.
@@ -55,8 +72,10 @@ One inbox for idol DMs across platforms, with JP / romaji / English aligned.
 Copy your secrets across first — `.env.local` (this repo) and `collector/.env` are **not**
 in git. Bring them from the Mac (they hold the working DATABASE_URL, keys, etc.), or fill
 `.env.example`. Required app vars: `DATABASE_URL`, `ANTHROPIC_API_KEY`, `TRANSLATE_MODEL`,
-`FAN_NICKNAME`, `BLOB_READ_WRITE_TOKEN`, `INGEST_SECRET`, `BSTAGE_EMAIL`/`BSTAGE_PASSWORD`,
-`COSM_*`. Collector vars: `INGEST_URL`, `INGEST_SECRET`, `COLLECT_SOURCES`,
+`FAN_NICKNAME`, `INGEST_SECRET`, `BSTAGE_EMAIL`/`BSTAGE_PASSWORD`, `COSM_*`. Optional:
+`BLOB_READ_WRITE_TOKEN` (only for `MEDIA_STORAGE=blob`/Vercel — local disk otherwise),
+`DB_DRIVER`/`MEDIA_STORAGE`/`MEDIA_DIR` (driver + storage overrides). Collector vars:
+`INGEST_URL`, `INGEST_SECRET`, `COLLECT_SOURCES`,
 `WEVERSE_ROOM_IDS`, `CDP_URL`.
 
 ```bash

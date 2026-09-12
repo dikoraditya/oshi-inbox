@@ -10,8 +10,7 @@
 /** The apps Oshi Inbox aggregates. Order matters — it drives the filter row. */
 export const SOURCES = [
   "Weverse DM",
-  "755 Talk",
-  "niajoy Talk",
+  "≒JOY LINK",
   "=LOVE LINK",
   "≠ME LINK",
   "Nogizaka Mail",
@@ -35,7 +34,7 @@ export type IngestSource = (typeof INGEST_SOURCES)[number];
  * Sources are the opposite: a fixed property of the app, because each one is a
  * separate integration rather than a label you invent.
  */
-export const GROUP_ORDER = ["AKB48", "Nogizaka46", "niajoy", "=LOVE", "≠ME", "NMB48"] as const;
+export const GROUP_ORDER = ["AKB48", "Nogizaka46", "≒JOY", "=LOVE", "≠ME", "NMB48"] as const;
 export type Group = string;
 
 export interface Member {

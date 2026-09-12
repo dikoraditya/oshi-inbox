@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { isConnected, labelName, registerWatch, watchState } from "@/lib/server/gmail";
+import { mediaBackend } from "@/lib/server/media";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -18,6 +19,7 @@ export async function GET() {
         googleClientId: !!process.env.GOOGLE_CLIENT_ID,
         pubsubTopic: !!process.env.GMAIL_PUBSUB_TOPIC,
         blobToken: !!process.env.BLOB_READ_WRITE_TOKEN,
+        mediaStorage: mediaBackend(),
         anthropicKey: !!process.env.ANTHROPIC_API_KEY,
       },
     });

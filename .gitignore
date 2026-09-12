@@ -6,11 +6,17 @@ out/
 *.tsbuildinfo
 next-env.d.ts
 
+# locally-stored media (MEDIA_STORAGE=local) — pics/videos, never commit
+/public/media/
+
 # reverse-engineering captures — contain tokens + private messages, never commit
 *.har
+# raw API response dumps — same risk as .har, never commit
+resp*.json
 
-# The collector is its own repo (oshi-inbox-collector).
-collector/
+# The standalone collector tool is its own repo (oshi-inbox-collector). Anchored
+# to the repo root so it doesn't also ignore src/app/api/collector/ (a route).
+/collector/
 
 # scratch/diagnostic scripts
 _*.ts

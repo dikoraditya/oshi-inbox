@@ -1,21 +1,20 @@
 import "server-only";
 
-import { neon } from "@neondatabase/serverless";
+import { createSql } from "./sql";
+import { randomUUID } from "node:crypto";
 
 import type { Gloss, MediaType, Member, Message, Source, TranslationStatus } from "@/lib/types";
 
 /**
  * Server-side data access.
  *
- * Neon's HTTP driver rather than a pooled TCP client: Vercel functions are
- * short-lived and would otherwise exhaust Postgres connections under any real
- * concurrency. One HTTP round trip per statement, no pool to manage.
+ * The driver is chosen in ./sql — Neon's HTTP driver in the cloud (Vercel
+ * functions are short-lived and would otherwise exhaust a TCP pool), or a
+ * node-postgres adapter with the identical surface for a local Postgres.
  */
 
 function client() {
-  const url = process.env.DATABASE_URL;
-  if (!url) throw new Error("DATABASE_URL is not set.");
-  return neon(url);
+  return createSql();
 }
 
 /* ── row mapping ─────────────────────────────────────────────────────────── */
@@ -226,6 +225,63 @@ export async function memberForSender(email: string): Promise<Member | null> {
     from members where ${address} = any(email_addresses) limit 1
   `) as MemberRow[];
   return rows[0] ? toMember(rows[0]) : null;
+}
+
+/**
+ * Map a sender address to a member, creating one when it is genuinely new.
+ *
+ * The label-free listen path: hand the app an email (optionally a name/group)
+ * and it either finds the member that already owns that address, matches an
+ * existing member **of the same source** by name and learns the address for
+ * them, or creates a fresh member and attaches it. The same-source rule keeps
+ * methods separate: a Mobile Mail address for someone who also has a Weverse
+ * member gets its own Mobile Mail member instead of merging into the Weverse
+ * one. Idempotent — the same email always resolves to the same member.
+ */
+export async function resolveOrCreateMemberByEmail(input: {
+  email: string;
+  name?: string;
+  group?: string;
+  source?: Source;
+}): Promise<{ member: Member; created: boolean }> {
+  const email = input.email.trim().toLowerCase();
+  if (!email) throw new Error("An email address is required.");
+
+  // The method this registration is for. Matching and creation are both scoped
+  // to it, so an idol reachable on several apps keeps one member per method.
+  const source: Source = input.source ?? "Mobile Mail";
+
+  // 1. Already mapped to someone.
+  const owner = await memberForSender(email);
+  if (owner) return { member: owner, created: false };
+
+  const wantName = input.name?.trim();
+
+  // 2. Matches an existing roster member by name → learn the address for them.
+  if (wantName) {
+    const members = await listMembers();
+    const match = members.find(
+      (m) => m.name.toLowerCase() === wantName.toLowerCase() && m.source === source,
+    );
+    if (match) {
+      await learnSenderAddress(match.id, email);
+      return {
+        member: { ...match, emailAddresses: [...match.emailAddresses, email] },
+        created: false,
+      };
+    }
+  }
+
+  // 3. Genuinely new → create a member and attach the address.
+  const groups = await listGroups();
+  const member = await insertMember({
+    id: `mbr-${randomUUID()}`,
+    name: wantName || email.split("@")[0],
+    group: input.group?.trim() || groups[0] || "Unsorted",
+    source,
+  });
+  await learnSenderAddress(member.id, email);
+  return { member: { ...member, emailAddresses: [email] }, created: true };
 }
 
 /** Remember that this source-scoped key belongs to this member. */
@@ -465,12 +521,13 @@ export async function markTranslationPending(id: string): Promise<void> {
   await sql`update messages set status = 'pending', error = null where id = ${id}`;
 }
 
-/** Anything still awaiting translation — drained by cron as a safety net. */
+/** Pending translations, newest first — so a limited credit budget translates
+ * the latest messages before the older backlog. Drained by cron as a safety net. */
 export async function listPending(limit = 10): Promise<Message[]> {
   const sql = client();
   const rows = (await sql.query(
     `select ${MESSAGE_COLUMNS} from messages
-     where status = 'pending' and jp <> '' order by created_at asc limit $1`,
+     where status = 'pending' and jp <> '' order by created_at desc limit $1`,
     [limit],
   )) as MessageRow[];
   return rows.map(toMessage);

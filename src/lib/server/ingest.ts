@@ -1,10 +1,9 @@
 import "server-only";
 
-import { put } from "@vercel/blob";
-
 import { messageId, type NormalizedMessage } from "@/lib/ingest";
 import { PLACEHOLDER_IMAGE, type Message } from "@/lib/types";
 import { insertIngestedExternal, learnAttributionKey, memberForKey, messageExists } from "./db";
+import { storeMedia } from "./media";
 
 /**
  * Source-agnostic ingestion for the collector's API-based apps.
@@ -28,14 +27,13 @@ function withFanName(jp: string): string {
 }
 
 /**
- * Copy a remote image into Blob during ingest.
+ * Copy a remote image or video into media storage during ingest.
  *
  * Source media URLs are short-lived signed links (CloudFront/GCS, ~15 min), so
  * they are fetched the moment we see them and never persisted as-is. A failure
  * here is non-fatal: the message still stores, just without its picture.
  */
 async function storeImage(id: string, url: string): Promise<string | null> {
-  if (!process.env.BLOB_READ_WRITE_TOKEN) return null;
   try {
     const response = await fetch(url);
     if (!response.ok) {
@@ -44,11 +42,7 @@ async function storeImage(id: string, url: string): Promise<string | null> {
     }
     const contentType = response.headers.get("content-type") || "image/jpeg";
     const extension = contentType.split("/")[1]?.split("+")[0]?.split(";")[0] || "jpg";
-    const blob = await put(`ingest/${id}.${extension}`, await response.arrayBuffer(), {
-      access: "public",
-      contentType,
-    });
-    return blob.url;
+    return await storeMedia(`ingest/${id}.${extension}`, await response.arrayBuffer(), contentType);
   } catch (error) {
     console.error(`[ingest] media store failed for ${id}`, error);
     return null;

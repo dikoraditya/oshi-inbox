@@ -7,11 +7,12 @@ import { EditorView } from "@/components/EditorView";
 import { MemberEditView } from "@/components/MemberEditView";
 import { InboxView, type GroupFilter, type SourceFilter } from "@/components/InboxView";
 import { RosterView } from "@/components/RosterView";
+import { StatisticsView } from "@/components/StatisticsView";
 import { TabBar, type TabKey } from "@/components/TabBar";
 import { ThreadView } from "@/components/ThreadView";
 import { useInbox, type Draft } from "@/lib/store";
 
-type View = "inbox" | "thread" | "editor" | "assign" | "roster" | "member-edit";
+type View = "inbox" | "thread" | "statistics" | "editor" | "assign" | "roster" | "member-edit";
 
 /** The mock status bar completes the phone frame on desktop; the clock is real. */
 function StatusBar({ offline }: { offline: boolean }) {
@@ -65,7 +66,6 @@ export default function Page() {
   // attribution key; that gates the Fetch UI.
   const FETCH_PREFIXES = ["cosm:", "bstage:"];
   const isFetchKey = (k: string) => FETCH_PREFIXES.some((p) => k.startsWith(p));
-  const hasFetchable = store.members.some((m) => (m.attributionKeys ?? []).some(isFetchKey));
   const activeFetchKey = activeMember?.attributionKeys?.find(isFetchKey) ?? null;
 
   const editingMessage = editingId ? (store.messages.find((m) => m.id === editingId) ?? null) : null;
@@ -86,8 +86,8 @@ export default function Page() {
   }
 
   function onTab(key: TabKey) {
-    if (key === "capture") {
-      openEditor(null, activeMemberId ?? store.members[0]?.id);
+    if (key === "statistics") {
+      setView("statistics");
       return;
     }
     if (key === "roster") {
@@ -130,9 +130,9 @@ export default function Page() {
   }
 
   const activeTab: TabKey =
-    view === "editor"
-      ? "capture"
-      : view === "thread"
+    view === "statistics"
+      ? "statistics"
+      : view === "thread" || view === "editor"
         ? "thread"
         : view === "roster"
           ? "roster"
@@ -175,8 +175,6 @@ export default function Page() {
               setAssigningId(messageId);
               setView("assign");
             }}
-            onFetchAll={hasFetchable ? () => store.fetchSources() : undefined}
-            onSyncApps={() => store.queueCollector("all")}
           />
         )}
 
@@ -210,6 +208,10 @@ export default function Page() {
             onAddGroup={store.addGroup}
             onOpenMember={openThread}
           />
+        )}
+
+        {usable && view === "statistics" && (
+          <StatisticsView members={store.members} messages={store.messages} />
         )}
 
         {usable && view === "assign" && assigningMessage && (

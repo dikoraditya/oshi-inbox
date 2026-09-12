@@ -9,14 +9,19 @@
     "typecheck": "tsc --noEmit",
     "db:push": "tsx scripts/db-push.ts",
     "db:seed-cosm": "tsx scripts/seed-cosm.ts",
-    "db:seed-bstage": "tsx scripts/seed-bstage.ts"
+    "db:seed-bstage": "tsx scripts/seed-bstage.ts",
+    "media:mirror-local": "tsx scripts/mirror-blob.ts",
+    "media:sync-to-blob": "tsx scripts/sync-media.ts",
+    "media:reap-blank": "tsx scripts/reap-blank.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.120.0",
     "@neondatabase/serverless": "^1.1.0",
     "@vercel/blob": "^2.8.0",
-    "googleapis": "^176.0.0",
+    "google-auth-library": "^11.0.2",
+    "googleapis": "^180.0.0",
     "next": "^16.3.2",
+    "pg": "^8.13.1",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
     "server-only": "^0.0.1",
@@ -24,6 +29,7 @@
   },
   "devDependencies": {
     "@types/node": "^26.3.0",
+    "@types/pg": "^8.11.10",
     "@types/react": "^19.2.18",
     "@types/react-dom": "^19.2.5",
     "dotenv": "^17.4.2",

@@ -443,6 +443,7 @@ button {
   width: 100%;
   height: 100%;
   object-fit: cover;
+  object-position: top;
   display: block;
 }
 .row-body {
@@ -504,6 +505,11 @@ button {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+.row-preview--muted {
+  font-family: var(--font-heading);
+  color: var(--ink-55);
+  font-style: italic;
 }
 
 .empty {
@@ -1126,6 +1132,85 @@ button {
 }
 
 /* ══════════════════════════════════════════════════════════════════════════
+   Statistics
+   ══════════════════════════════════════════════════════════════════════════ */
+
+.stat-card {
+  padding: 16px;
+  border-bottom: 2px solid var(--color-divider);
+}
+.stat-head {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 12px;
+  align-items: center;
+}
+.stat-since {
+  text-align: right;
+}
+.stat-since-dur {
+  font-family: var(--font-heading);
+  font-weight: 800;
+  font-size: 14px;
+  white-space: nowrap;
+}
+.stat-since-date {
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-55);
+  margin-top: 3px;
+}
+.stat-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 2px;
+  margin-top: 14px;
+  background: var(--ink-15);
+  border: 1px solid var(--ink-15);
+}
+.stat-cell {
+  background: var(--color-neutral-100);
+  padding: 12px;
+  text-align: center;
+}
+.stat-num {
+  font-family: var(--font-heading);
+  font-weight: 800;
+  font-size: 24px;
+  line-height: 1;
+}
+.stat-label {
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-55);
+  margin-top: 6px;
+}
+.stat-breakdown {
+  margin-top: 14px;
+}
+.stat-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 8px;
+}
+.stat-chip {
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  padding: 5px 9px;
+  background: var(--color-surface);
+  border: 1px solid var(--ink-15);
+  color: var(--ink-70);
+}
+.stat-chip b {
+  font-family: var(--font-heading);
+  font-weight: 800;
+  color: var(--color-text);
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
    Tab bar
    ══════════════════════════════════════════════════════════════════════════ */
 
@@ -1165,6 +1250,30 @@ button {
   background: var(--color-accent);
 }
 
+/* Floating "jump to the bottom of the inbox" control, sitting above the tab bar. */
+.jump-bottom {
+  position: absolute;
+  right: 16px;
+  bottom: calc(env(safe-area-inset-bottom, 0px) + 64px);
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  border: 2px solid var(--color-text);
+  background: var(--color-bg);
+  color: var(--color-text);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 22px;
+  line-height: 1;
+  cursor: pointer;
+  z-index: 5;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.18);
+}
+.jump-bottom:hover {
+  background: var(--hover-5);
+}
+
 /* Screen-reader-only text for controls whose label is purely visual. */
 .sr-only {
   position: absolute;
@@ -1182,6 +1291,7 @@ button {
 /* An <img> used directly as the inbox avatar (not nested), so cover it here. */
 .row-avatar--img {
   object-fit: cover;
+  object-position: top;
 }
 .viewhead-avatar {
   flex: 0 0 auto;
@@ -1189,6 +1299,7 @@ button {
   height: 34px;
   border-radius: 8px;
   object-fit: cover;
+  object-position: top;
   margin-right: 8px;
   background: var(--color-neutral-300);
 }
@@ -1226,4 +1337,68 @@ button {
   font-size: 12px;
   color: var(--color-neutral-700);
   word-break: break-all;
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   Long reader (email) + demo
+   ══════════════════════════════════════════════════════════════════════════ */
+
+.demo-sec {
+  border-bottom: 2px solid var(--color-divider);
+}
+.lr {
+  padding: 12px 16px 20px;
+}
+.lr-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 4px 0 10px;
+  border-bottom: 1px solid var(--ink-15);
+  margin-bottom: 8px;
+}
+.lr-para {
+  padding: 8px 0;
+}
+.lr-para + .lr-para {
+  border-top: 1px dashed var(--ink-15);
+}
+.lr-sent {
+  display: grid;
+  grid-template-columns: 22px 1fr;
+  gap: 8px;
+  padding: 6px 8px 6px 0;
+  cursor: pointer;
+  border-left: 3px solid transparent;
+  margin-left: -3px;
+}
+.lr-sent.is-active {
+  border-left-color: var(--color-accent);
+  background: var(--color-accent-100);
+}
+.lr-num {
+  font-family: var(--font-heading);
+  font-weight: 800;
+  font-size: 10px;
+  color: var(--ink-45);
+  text-align: right;
+  padding-top: 3px;
+}
+.lr-lines {
+  min-width: 0;
+}
+.lr-jp {
+  font-family: var(--font-jp);
+  font-size: 15px;
+  line-height: 1.7;
+}
+.lr-ro {
+  font-size: 12px;
+  color: var(--ink-55);
+  margin-top: 2px;
+}
+.lr-en {
+  font-size: 13px;
+  color: var(--ink-70);
+  margin-top: 3px;
 }

@@ -15,15 +15,16 @@
  * collector/src/adapters/cosm.ts — keep the two in sync if a roster changes.
  */
 
-import { neon } from "@neondatabase/serverless";
 import "dotenv/config";
+
+import { createSql } from "../src/lib/server/sql";
 
 const url = process.env.DATABASE_URL;
 if (!url) {
   console.error("DATABASE_URL is not set. Put it in .env.local, or run `vercel env pull`.");
   process.exit(1);
 }
-const sql = neon(url);
+const sql = createSql();
 
 interface CosmGroupSeed {
   group: string;
@@ -50,12 +51,12 @@ const GROUPS: CosmGroupSeed[] = [
     },
   },
   {
-    group: "niajoy",
-    source: "niajoy Talk",
+    group: "≒JOY",
+    source: "≒JOY LINK",
     rooms: {
-      45: "逢田珠里依", 46: "天野香乃愛", 47: "市原愛弓", 48: "江角怜音", 49: "大信田美月",
-      50: "大西葵", 51: "小澤愛実", 52: "髙橋舞", 53: "藤沢莉子", 54: "村山結香",
-      55: "山田杏佳", 56: "山野愛月",
+      45: "Aida Jurii", 46: "Amano Konoa", 47: "Ichihara Ayumi", 48: "Esumi Reon", 49: "Oshida Mizuki",
+      50: "Onishi Aoi", 51: "Ozawa Manami", 52: "Takahashi Mai", 53: "Fujisawa Riko", 54: "Murayama Yuka",
+      55: "Yamada Kyoka", 56: "Yamano Arutsuki",
     },
   },
 ];

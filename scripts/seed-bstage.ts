@@ -10,8 +10,9 @@
  * Standalone (no app imports): needs DATABASE_URL + BSTAGE_EMAIL + BSTAGE_PASSWORD.
  */
 
-import { neon } from "@neondatabase/serverless";
 import "dotenv/config";
+
+import { createSql } from "../src/lib/server/sql";
 
 const dbUrl = process.env.DATABASE_URL;
 if (!dbUrl) {
@@ -30,7 +31,7 @@ const host = `https://${stageId}.bstage.in`;
 const GROUP = "NMB48";
 const SOURCE = "NMB48 Talk";
 
-const sql = neon(dbUrl);
+const sql = createSql();
 
 async function main(): Promise<void> {
   const loginRes = await fetch(`${host}/svc/account/api/v1/auth/token?stageId=${stageId}`, {

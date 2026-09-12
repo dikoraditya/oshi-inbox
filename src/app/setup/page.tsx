@@ -11,6 +11,7 @@ interface Status {
     googleClientId: boolean;
     pubsubTopic: boolean;
     blobToken: boolean;
+    mediaStorage: "local" | "blob" | "both";
     anthropicKey: boolean;
   };
 }
@@ -88,7 +89,14 @@ export default function SetupPage() {
             <Check ok={!!status?.env.googleClientId}>GOOGLE_CLIENT_ID / SECRET</Check>
             <Check ok={!!status?.env.pubsubTopic}>GMAIL_PUBSUB_TOPIC</Check>
             <Check ok={!!status?.env.anthropicKey}>ANTHROPIC_API_KEY</Check>
-            <Check ok={!!status?.env.blobToken}>BLOB_READ_WRITE_TOKEN (image attachments)</Check>
+            <Check ok>
+              Media storage:{" "}
+              {status?.env.mediaStorage === "local"
+                ? "local disk (public/media)"
+                : status?.env.mediaStorage === "both"
+                  ? "Vercel Blob + local disk"
+                  : "Vercel Blob"}
+            </Check>
           </div>
 
           <div className="field">

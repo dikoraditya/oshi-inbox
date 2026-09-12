@@ -1,6 +1,7 @@
 import { after, NextResponse } from "next/server";
 
 import { IngestBatchSchema } from "@/lib/ingest";
+import { authorizeCollector } from "@/lib/server/collector-auth";
 import { ingestBatch } from "@/lib/server/ingest";
 import { runTranslation } from "@/lib/server/pipeline";
 
@@ -21,24 +22,10 @@ export const dynamic = "force-dynamic";
 /** A backfill batch fetches media for up to 500 messages — give it room. */
 export const maxDuration = 60;
 
-/**
- * Fails closed: with INGEST_SECRET unset the endpoint refuses everything rather
- * than accepting anonymous writes.
- */
-function authorize(request: Request): string | null {
-  const secret = process.env.INGEST_SECRET;
-  if (!secret) return "Ingest endpoint is not configured — set INGEST_SECRET.";
-  const header = request.headers.get("authorization") || "";
-  const token = header.startsWith("Bearer ") ? header.slice(7) : header;
-  // Length-invariant compare, matching the auth module's discipline.
-  if (token.length !== secret.length) return "Not authorised.";
-  let diff = 0;
-  for (let i = 0; i < token.length; i += 1) diff |= token.charCodeAt(i) ^ secret.charCodeAt(i);
-  return diff === 0 ? null : "Not authorised.";
-}
-
+/** Stores everything as pending and returns immediately; translation runs in
+ * after() so a large backfill doesn't hold the request open. */
 export async function POST(request: Request) {
-  const rejection = authorize(request);
+  const rejection = authorizeCollector(request);
   if (rejection) {
     const configured = Boolean(process.env.INGEST_SECRET);
     return NextResponse.json({ error: rejection }, { status: configured ? 401 : 500 });
