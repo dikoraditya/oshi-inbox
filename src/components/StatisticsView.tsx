@@ -68,9 +68,12 @@ function Avatar({ member }: { member: Member }) {
 export function StatisticsView({
   members,
   messages,
+  groups,
 }: {
   members: Member[];
   messages: Message[];
+  /** Group names from the database, in display order. */
+  groups: string[];
 }) {
   const stats = useMemo<MemberStat[]>(() => {
     const byId = new Map<string, Member>(members.map((m) => [m.id, m]));
@@ -114,22 +117,38 @@ export function StatisticsView({
   }, [members, messages]);
 
   const [sortMode, setSortMode] = useState<"messages" | "followed">("messages");
+  const [groupFilter, setGroupFilter] = useState<string>("All");
   const sorted = useMemo(() => {
-    const arr = [...stats];
+    const arr = stats.filter(
+      (s) => groupFilter === "All" || s.member.group === groupFilter,
+    );
     arr.sort(
       sortMode === "messages"
         ? (a, b) => b.total - a.total || a.firstAt - b.firstAt
         : (a, b) => a.firstAt - b.firstAt,
     );
     return arr;
-  }, [stats, sortMode]);
+  }, [stats, sortMode, groupFilter]);
 
   return (
     <>
       <div className="roster-head">
         <h1 className="inbox-title">Statistics</h1>
         <div className="roster-sub">
-          {stats.length === 1 ? "1 active member" : `${stats.length} active members`}
+          {sorted.length === 1 ? "1 active member" : `${sorted.length} active members`}
+        </div>
+        <div className="chiprow chiprow--group">
+          {["All", ...groups].map((group) => (
+            <button
+              key={group}
+              type="button"
+              className="chip-group"
+              aria-pressed={groupFilter === group}
+              onClick={() => setGroupFilter(group)}
+            >
+              {group === "All" ? "All groups" : group}
+            </button>
+          ))}
         </div>
         <div className="chiprow chiprow--group">
           <button

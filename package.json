@@ -12,6 +12,7 @@
     "db:seed-bstage": "tsx scripts/seed-bstage.ts",
     "media:mirror-local": "tsx scripts/mirror-blob.ts",
     "media:sync-to-blob": "tsx scripts/sync-media.ts",
+    "media:relink-local": "tsx scripts/relink-blob-to-local.ts",
     "media:reap-blank": "tsx scripts/reap-blank.ts"
   },
   "dependencies": {

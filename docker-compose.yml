@@ -1,0 +1,71 @@
+# Full self-hosted stack: the Next.js app + its own Postgres, with media on a
+# persistent volume. Use it to run/verify the whole thing locally, and as the
+# reference topology for SumoPod (app container + Postgres container + volumes).
+#
+# Secrets come from a .env file beside this one — copy .env.sumopod.example to
+# .env and fill it in. Bring the stack up with:  docker compose up -d --build
+
+services:
+  db:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: oshi
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+      POSTGRES_DB: oshi
+      # Force UTF8 so the multibyte group names (≒JOY, ≠ME, =LOVE) store the same
+      # as they do on Neon, regardless of the image's default initdb locale.
+      POSTGRES_INITDB_ARGS: "--encoding=UTF8"
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+      # Applied once, on a fresh volume, by the postgres image's init hook — the
+      # standalone app image can't run `npm run db:push` (no tsx/src). schema.sql
+      # is the single source of truth; seed-groups.sql mirrors db-push's seeding.
+      - ./db/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
+      - ./db/seed-groups.sql:/docker-entrypoint-initdb.d/02-seed-groups.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U oshi -d oshi"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  app:
+    build: .
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "3000:3000"
+    environment:
+      # node-postgres is required for a bare Postgres; the service name is not a
+      # localhost URL, so the driver must be forced explicitly.
+      DATABASE_URL: postgres://oshi:${POSTGRES_PASSWORD}@db:5432/oshi
+      DB_DRIVER: pg
+      # Media on the mounted volume, served by Next as /media/* static files.
+      MEDIA_STORAGE: local
+      MEDIA_DIR: /app/public/media
+      # Security — required on a public URL.
+      APP_PASSWORD: ${APP_PASSWORD:?set APP_PASSWORD in .env}
+      CRON_SECRET: ${CRON_SECRET:?set CRON_SECRET in .env}
+      INGEST_SECRET: ${INGEST_SECRET:?set INGEST_SECRET in .env}
+      # Translation.
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:?set ANTHROPIC_API_KEY in .env}
+      TRANSLATE_MODEL: ${TRANSLATE_MODEL:-claude-haiku-4-5}
+      FAN_NICKNAME: ${FAN_NICKNAME:-}
+      # COSM in-app Fetch (optional).
+      COSM_USERNAME: ${COSM_USERNAME:-}
+      COSM_PASSWORD: ${COSM_PASSWORD:-}
+      COSM_EQUAL_LOVE_UUID: ${COSM_EQUAL_LOVE_UUID:-}
+      COSM_NOT_EQUAL_ME_UUID: ${COSM_NOT_EQUAL_ME_UUID:-}
+      COSM_NEARLY_EQUAL_JOY_UUID: ${COSM_NEARLY_EQUAL_JOY_UUID:-}
+      COSM_REQUEST_VERIFICATION_KEY: ${COSM_REQUEST_VERIFICATION_KEY:-}
+      # NMB48 b.stage in-app Fetch (optional).
+      BSTAGE_EMAIL: ${BSTAGE_EMAIL:-}
+      BSTAGE_PASSWORD: ${BSTAGE_PASSWORD:-}
+    volumes:
+      - media_data:/app/public/media
+
+volumes:
+  pg_data:
+  media_data:

@@ -1,0 +1,31 @@
+# Rebuilt inside the image
+node_modules
+.next
+
+# Secrets never belong in the image (env is injected by SumoPod at runtime)
+.env
+.env.*
+
+# VCS / editor / OS
+.git
+.gitignore
+.DS_Store
+.claude
+
+# Local-only media + scratch dumps (7MB+ each)
+public/media
+resp.json
+resp2.json
+r3.json
+*.tsbuildinfo
+
+# The collector is a separate repo/deploy
+collector
+
+# Docs + this build's own inputs
+CONTINUATION.md
+SETUP.md
+README.md
+Dockerfile
+.dockerignore
+npm-debug.log*

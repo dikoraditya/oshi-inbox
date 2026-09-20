@@ -98,6 +98,35 @@ Collector auth note: it drives a Chrome with `--remote-debugging-port=9222`. On 
 launch Chrome once with that flag + a dedicated profile, log into weverse.io and
 message.nogizaka46.com, then run `npm run collect`. See the collector README.
 
+## Docker / self-host deploy (latest session)
+Runs the whole app as one container against a bundled Postgres — for SumoPod, and
+for a fully local run with no cloud. Files: `Dockerfile`, `docker-compose.yml`,
+`.dockerignore`, `docker/` (entrypoint + cron scheduler), `.env.sumopod.example`,
+`db/seed-groups.sql`.
+- **Dockerfile**: multi-stage → Next.js standalone (`output: "standalone"` in
+  `next.config.ts`), non-root user, `entrypoint.sh` backgrounds an in-container
+  cron scheduler (`docker/scheduler.mjs`, replaces Vercel Cron) then runs
+  `node server.js`. Only starts the scheduler when `CRON_SECRET` is set.
+- **docker-compose.yml**: `app` + `postgres:17-alpine` + volumes (`pg_data`,
+  `media_data` at `/app/public/media`). The standalone image can't run
+  `npm run db:push` (no `tsx`/`src`), so Postgres auto-applies `db/schema.sql`
+  then `db/seed-groups.sql` via `/docker-entrypoint-initdb.d` on a **fresh
+  volume only**. `POSTGRES_INITDB_ARGS=--encoding=UTF8` keeps the multibyte group
+  names (≒JOY, ≠ME, =LOVE) matching Neon. `db:push` remains the path for
+  existing/Neon databases.
+- **Run it (also the SumoPod reference topology):**
+  ```bash
+  cp .env.sumopod.example .env    # fill POSTGRES_PASSWORD, APP_PASSWORD,
+                                  # CRON_SECRET, INGEST_SECRET, ANTHROPIC_API_KEY, …
+  docker compose up -d --build    # app on http://localhost:3000
+  docker compose logs db          # expect 01-schema + 02-seed-groups ran once
+  ```
+  `DB_DRIVER=pg`, `MEDIA_STORAGE=local`, `MEDIA_DIR` are set in compose; on
+  SumoPod (no compose) set them on the app container plus `DATABASE_URL`.
+- **Not yet run end-to-end**: Docker isn't installed on the current dev machine,
+  so `docker compose up` is unverified. YAML + idempotent SQL were reviewed;
+  verify on a Docker host with the `logs db` check above.
+
 ## Sharing context across devices
 - **Data**: already shared — Neon Postgres + Vercel Blob are cloud. Same `.env.local` →
   same inbox on any machine. No sync needed.

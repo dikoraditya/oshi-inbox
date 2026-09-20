@@ -1,16 +1,16 @@
 /**
- * Applies db/schema.sql, then seeds members and messages if the tables are empty.
+ * Applies db/schema.sql and ensures the base group rows exist.
  *
  *   npm run db:push
  *
- * Safe to re-run: every schema statement is IF NOT EXISTS, and seeding is
- * skipped once any member row exists.
+ * Safe to re-run: every schema statement is IF NOT EXISTS and group inserts are
+ * ON CONFLICT DO NOTHING. Real member/message data comes from the live sources
+ * (collector, Gmail, in-app Fetch) — this never writes fixtures.
  */
 
 import { readFileSync } from "node:fs";
 import "dotenv/config";
 
-import { buildSeedMessages, MEMBERS } from "../src/lib/seed";
 import { createSql } from "../src/lib/server/sql";
 import { GROUP_ORDER } from "../src/lib/types";
 
@@ -45,35 +45,6 @@ async function main(): Promise<void> {
     `;
   }
   console.log(`Ensured ${GROUP_ORDER.length} groups.`);
-
-  const rows = (await sql`select count(*)::int as count from members`) as Array<{ count: number }>;
-  if (rows[0].count > 0) {
-    console.log(`Members already present (${rows[0].count}) — skipping seed.`);
-    return;
-  }
-
-  for (const [index, member] of MEMBERS.entries()) {
-    await sql`
-      insert into members (id, name, "group", source, unread, time, sort_order)
-      values (${member.id}, ${member.name}, ${member.group}, ${member.source},
-              ${member.unread}, ${member.time}, ${index})
-      on conflict (id) do nothing
-    `;
-  }
-
-  const messages = buildSeedMessages();
-  for (const message of messages) {
-    await sql`
-      insert into messages (id, member_id, jp, romaji, en, words, time, source,
-                            image_url, long, status, created_at)
-      values (${message.id}, ${message.memberId}, ${message.jp}, ${message.romaji},
-              ${message.en}, ${JSON.stringify(message.words)}, ${message.time},
-              ${message.source}, ${null}, ${message.long}, 'done', ${message.createdAt})
-      on conflict (id) do nothing
-    `;
-  }
-
-  console.log(`Seeded ${MEMBERS.length} members and ${messages.length} messages.`);
 }
 
 main().catch((error) => {

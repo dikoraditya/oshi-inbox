@@ -271,11 +271,20 @@ async function fetchRoom(
   return { messages: out, newestId };
 }
 
-function isVideo(media: CosmMedia): boolean {
+/**
+ * Best-effort media kind from COSM's own fields. The ingest layer refines this
+ * from the stored file's real content-type, but keep it honest here too:
+ * voice notes carry a duration and an audio content-type, so they must not be
+ * lumped in with video.
+ */
+function mediaKind(media: CosmMedia): MediaType {
   const ct = (media.contentType ?? "").toLowerCase();
-  if (ct.startsWith("video")) return true;
-  if (ct.startsWith("image")) return false;
-  return Number(media.durationInSecs ?? 0) > 0;
+  if (ct.startsWith("audio")) return "audio";
+  if (ct.startsWith("video")) return "video";
+  if (ct.startsWith("image")) return "image";
+  // No content type: a positive duration means a clip; in LINK talk rooms a
+  // text-less clip is overwhelmingly a voice note.
+  return Number(media.durationInSecs ?? 0) > 0 ? "audio" : "image";
 }
 
 function mediaUrl(media: CosmMedia): string | null {
@@ -304,7 +313,7 @@ function mapMessages(group: CosmGroup, roomId: number, decoded: CosmMessage[]): 
   return decoded.map((m) => {
     const media = m.chatMedia?.[0];
     const url = media ? mediaUrl(media) : null;
-    const mediaType: MediaType = media && isVideo(media) ? "video" : "image";
+    const mediaType: MediaType = media ? mediaKind(media) : "image";
     const createdAt = toEpochMs(m.postedDate);
     return {
       ingestSource: "cosm" as const,

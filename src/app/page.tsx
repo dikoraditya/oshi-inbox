@@ -211,7 +211,7 @@ export default function Page() {
         )}
 
         {usable && view === "statistics" && (
-          <StatisticsView members={store.members} messages={store.messages} />
+          <StatisticsView members={store.members} messages={store.messages} groups={store.groups} />
         )}
 
         {usable && view === "assign" && assigningMessage && (

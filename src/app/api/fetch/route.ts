@@ -60,7 +60,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: errors.join("; ") }, { status: 502 });
   }
 
-  const { inserted, scanned } = await ingestBatch(messages);
+  const { inserted, repaired, scanned } = await ingestBatch(messages);
   after(async () => {
     for (const message of inserted) {
       await runTranslation(message.id);
@@ -71,6 +71,7 @@ export async function POST(request: Request) {
     ok: true,
     scanned,
     inserted: inserted.length,
+    repaired,
     ...(errors.length ? { errors } : {}),
   });
 }

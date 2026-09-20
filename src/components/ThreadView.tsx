@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
 
 import { MessagePhoto } from "./MessagePhoto";
 import { segment, splitJp, splitLatin } from "@/lib/text";
@@ -62,7 +62,7 @@ function SentenceRow({
   );
 }
 
-function MessageCard({
+const MessageCard = memo(function MessageCard({
   message,
   member,
   settings,
@@ -80,8 +80,8 @@ function MessageCard({
   openWord: string | null;
   onPickSentence: (id: string) => void;
   onPickWord: (id: string) => void;
-  onEdit: () => void;
-  onRetry: () => void;
+  onEdit: (messageId: string) => void;
+  onRetry: (messageId: string) => void;
 }) {
   const [showEn, setShowEn] = useState<boolean | null>(null);
   const [expanded, setExpanded] = useState(false);
@@ -89,6 +89,13 @@ function MessageCard({
   const jpSentences = useMemo(() => splitJp(message.jp), [message.jp]);
   const roSentences = useMemo(() => splitLatin(message.romaji), [message.romaji]);
   const enSentences = useMemo(() => splitLatin(message.en), [message.en]);
+
+  // Word segmentation is pure over (jp, words); memoize so tapping a sentence or
+  // toggling English elsewhere in the thread never re-runs it.
+  const segments = useMemo(
+    () => jpSentences.map((sentence) => segment(sentence, message.words)),
+    [jpSentences, message.words],
+  );
 
   const aligned = jpSentences.length > 1;
   const clipped = message.long && !expanded;
@@ -109,7 +116,7 @@ function MessageCard({
         <div className="lbl-member">{member.name}</div>
         <div className="lbl-rule" aria-hidden="true" />
         <div className="lbl-time">{message.time}</div>
-        <button type="button" className="btn-edit" onClick={onEdit}>
+        <button type="button" className="btn-edit" onClick={() => onEdit(message.id)}>
           Edit
         </button>
       </div>
@@ -135,7 +142,7 @@ function MessageCard({
                   hasNestedControls
                 >
                   <span lang="ja">
-                    {segment(sentence, message.words).map((part, partIndex) => {
+                    {segments[index].map((part, partIndex) => {
                       if (part.kind === "plain") {
                         return <span key={partIndex}>{part.text}</span>;
                       }
@@ -178,7 +185,7 @@ function MessageCard({
           {message.status === "failed" && (
             <div className="msg-note msg-note--error">
               <span>{message.error ?? "Translation failed."}</span>
-              <button type="button" className="retry" onClick={onRetry}>
+              <button type="button" className="retry" onClick={() => onRetry(message.id)}>
                 Retry
               </button>
             </div>
@@ -251,7 +258,7 @@ function MessageCard({
       </div>
     </article>
   );
-}
+});
 
 export function ThreadView({
   member,
@@ -277,12 +284,45 @@ export function ThreadView({
   // One selection at a time across the whole thread, as the design had it.
   const [activeSentence, setActiveSentence] = useState<string | null>(null);
   const [openWord, setOpenWord] = useState<string | null>(null);
+
+  // Stable across renders so the memoized cards only re-render when their own
+  // narrowed active/open state changes — not on every tap elsewhere.
+  const pickSentence = useCallback(
+    (id: string) => setActiveSentence((current) => (current === id ? null : id)),
+    [],
+  );
+  const pickWord = useCallback(
+    (id: string) => setOpenWord((current) => (current === id ? null : id)),
+    [],
+  );
   const [fetching, setFetching] = useState(false);
   const [fetchNote, setFetchNote] = useState<string | null>(null);
 
   const scrollRef = useRef<HTMLDivElement>(null);
   const jumpToBottom = () =>
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
+
+  // Long threads (thousands of messages for one member) must not all mount at
+  // once — reconciling every card makes each tap lag. Render a window that grows
+  // as the user scrolls near the end.
+  const BATCH = 40;
+  const [visibleCount, setVisibleCount] = useState(BATCH);
+
+  // A fresh thread restarts from the top with a fresh window.
+  useEffect(() => {
+    setVisibleCount(BATCH);
+    scrollRef.current?.scrollTo({ top: 0 });
+  }, [member?.id]);
+
+  // Grow the window before the user reaches the bottom. Capped at the real
+  // length, so once everything is mounted this stops changing state.
+  const handleScroll = useCallback(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    if (el.scrollTop + el.clientHeight >= el.scrollHeight - 1200) {
+      setVisibleCount((count) => Math.min(count + BATCH, messages.length));
+    }
+  }, [messages.length]);
 
   async function runFetch() {
     if (!onFetch) return;
@@ -360,21 +400,27 @@ export function ThreadView({
         ref={scrollRef}
         // Tapping empty space dismisses an open gloss, matching the canvas.
         onClick={() => setOpenWord(null)}
+        onScroll={handleScroll}
       >
-        {messages.map((message) => (
-          <MessageCard
-            key={message.id}
-            message={message}
-            member={member}
-            settings={settings}
-            activeSentence={activeSentence}
-            openWord={openWord}
-            onPickSentence={(id) => setActiveSentence((current) => (current === id ? null : id))}
-            onPickWord={(id) => setOpenWord((current) => (current === id ? null : id))}
-            onEdit={() => onEdit(message.id)}
-            onRetry={() => onRetry(message.id)}
-          />
-        ))}
+        {messages.slice(0, visibleCount).map((message) => {
+          // Both selection ids start with `${message.id}-s`; narrowing here means
+          // a tap only changes props for the one card that owns the selection.
+          const prefix = `${message.id}-s`;
+          return (
+            <MessageCard
+              key={message.id}
+              message={message}
+              member={member}
+              settings={settings}
+              activeSentence={activeSentence?.startsWith(prefix) ? activeSentence : null}
+              openWord={openWord?.startsWith(prefix) ? openWord : null}
+              onPickSentence={pickSentence}
+              onPickWord={pickWord}
+              onEdit={onEdit}
+              onRetry={onRetry}
+            />
+          );
+        })}
 
         {messages.length === 0 && (
           <div className="empty">No messages yet. Add one from Capture.</div>

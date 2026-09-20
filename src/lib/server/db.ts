@@ -349,11 +349,29 @@ export async function getMessage(id: string): Promise<Message | null> {
   return rows[0] ? toMessage(rows[0]) : null;
 }
 
-/** Cheap existence check, so ingest can dedupe before doing expensive media work. */
-export async function messageExists(id: string): Promise<boolean> {
+/**
+ * Existence + media presence for an ingested row. Lets the collector path both
+ * dedupe cheaply and repair a row whose media copy previously failed (stored
+ * with a null image_url) once the source offers the file again.
+ */
+export async function messageMediaState(
+  id: string,
+): Promise<{ exists: boolean; imageUrl: string | null }> {
   const sql = client();
-  const rows = (await sql`select 1 from messages where id = ${id} limit 1`) as unknown[];
-  return rows.length > 0;
+  const rows = (await sql`select image_url from messages where id = ${id} limit 1`) as Array<{
+    image_url: string | null;
+  }>;
+  return rows[0] ? { exists: true, imageUrl: rows[0].image_url } : { exists: false, imageUrl: null };
+}
+
+/** Attach media to an existing row, leaving its text and translation untouched. */
+export async function updateMessageMedia(
+  id: string,
+  imageUrl: string,
+  mediaType: MediaType,
+): Promise<void> {
+  const sql = client();
+  await sql`update messages set image_url = ${imageUrl}, media_type = ${mediaType} where id = ${id}`;
 }
 
 /** Insert or overwrite a message. Used by the capture form and by edits. */
