@@ -77,6 +77,7 @@ export default function Page() {
     setActiveMemberId(memberId);
     setView("thread");
     void store.markRead(memberId);
+    void store.translatePending(memberId);
   }
 
   function openEditor(messageId: string | null, memberId?: string) {

@@ -2,7 +2,7 @@ import { OAuth2Client } from "google-auth-library";
 import { after, NextResponse } from "next/server";
 
 import { ingestSince } from "@/lib/server/gmail";
-import { runTranslation } from "@/lib/server/pipeline";
+import { eagerTranslate, runTranslation } from "@/lib/server/pipeline";
 
 /**
  * Cloud Pub/Sub push endpoint — the thing Gmail's watch ultimately calls.
@@ -88,7 +88,7 @@ export async function POST(request: Request) {
 
     // Translate after responding: Pub/Sub wants a fast ack, and a slow model
     // call here would push the delivery into a retry.
-    if (result.inserted.length > 0) {
+    if (eagerTranslate() && result.inserted.length > 0) {
       after(async () => {
         for (const message of result.inserted) {
           await runTranslation(message.id);

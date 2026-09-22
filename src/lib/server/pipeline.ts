@@ -8,6 +8,12 @@ import {
 } from "./db";
 import { translateJapanese, TranslationBillingError, TranslationError } from "./translate";
 
+/** Eager mode translates on ingest; lazy (the default) waits until a thread is
+ * opened (translate-on-read), so unread messages never cost anything. */
+export function eagerTranslate(): boolean {
+  return process.env.EAGER_TRANSLATE === "1";
+}
+
 /**
  * Translate one stored message and write the result back.
  *

@@ -39,9 +39,12 @@ const args = process.argv.slice(2);
 const useBatch = args.includes("--batch");
 const source = args.find((a) => !a.startsWith("--"));
 if (!source) {
-  console.error('usage: translate-source "<source>" [--batch]   (source "all" = every source)');
+  console.error('usage: translate-source "<source>" [--batch] [--since-days=N]   (source "all" = every source)');
   process.exit(1);
 }
+
+const sinceDaysRaw = args.find((a) => a.startsWith("--since-days="))?.split("=")[1];
+const sinceDays = sinceDaysRaw && Number.isFinite(Number(sinceDaysRaw)) ? Number(sinceDaysRaw) : null;
 
 const CONCURRENCY = Number(process.env.TRANSLATE_CONCURRENCY || "4");
 const MODEL = process.env.TRANSLATE_MODEL ?? "claude-haiku-4-5";
@@ -69,8 +72,9 @@ async function fillFromDone(): Promise<number> {
 async function distinctPending(): Promise<string[]> {
   const rows = (await sql.query(
     `select distinct jp from messages
-     where status = 'pending' and length(trim(jp)) > 0 and ($1 = 'all' or source = $1)`,
-    [source],
+     where status = 'pending' and length(trim(jp)) > 0 and ($1 = 'all' or source = $1)
+       and ($2::int is null or to_timestamp(created_at/1000) > now() - (($2::int)::text || ' days')::interval)`,
+    [source, sinceDays],
   )) as Array<{ jp: string }>;
   return rows.map((r) => r.jp);
 }

@@ -4,7 +4,7 @@ import type { NormalizedMessage } from "@/lib/ingest";
 import { allRoomIds, collectRooms, isConfigured as cosmConfigured } from "@/lib/server/cosm";
 import { collectCircles, isConfigured as bstageConfigured } from "@/lib/server/bstage";
 import { ingestBatch } from "@/lib/server/ingest";
-import { runTranslation } from "@/lib/server/pipeline";
+import { eagerTranslate, runTranslation } from "@/lib/server/pipeline";
 
 /**
  * On-demand fetch for the pure-REST sources (behind the app's passphrase gate).
@@ -61,11 +61,13 @@ export async function POST(request: Request) {
   }
 
   const { inserted, repaired, scanned } = await ingestBatch(messages);
-  after(async () => {
-    for (const message of inserted) {
-      await runTranslation(message.id);
-    }
-  });
+  if (eagerTranslate()) {
+    after(async () => {
+      for (const message of inserted) {
+        await runTranslation(message.id);
+      }
+    });
+  }
 
   return NextResponse.json({
     ok: true,

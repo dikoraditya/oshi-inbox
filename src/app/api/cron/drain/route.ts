@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 
 import { listPending } from "@/lib/server/db";
 import { ingestSince } from "@/lib/server/gmail";
-import { runTranslation } from "@/lib/server/pipeline";
+import { eagerTranslate, runTranslation } from "@/lib/server/pipeline";
 
 /**
  * Safety net.
@@ -42,7 +42,7 @@ export async function GET(request: Request) {
     ingestError = error instanceof Error ? error.message : "Ingestion failed.";
   }
 
-  const pending = await listPending(BATCH);
+  const pending = eagerTranslate() ? await listPending(BATCH) : [];
   let translated = 0;
   let paused = false;
   for (const message of pending) {

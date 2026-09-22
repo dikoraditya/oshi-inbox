@@ -3,7 +3,7 @@ import { after, NextResponse } from "next/server";
 import { IngestBatchSchema } from "@/lib/ingest";
 import { authorizeCollector } from "@/lib/server/collector-auth";
 import { ingestBatch } from "@/lib/server/ingest";
-import { runTranslation } from "@/lib/server/pipeline";
+import { eagerTranslate, runTranslation } from "@/lib/server/pipeline";
 
 /**
  * Ingest endpoint for the local collector.
@@ -49,11 +49,13 @@ export async function POST(request: Request) {
   const { inserted, scanned } = await ingestBatch(parsed.data.messages);
 
   // Translate only the newly inserted rows, off the response path.
-  after(async () => {
-    for (const message of inserted) {
-      await runTranslation(message.id);
-    }
-  });
+  if (eagerTranslate()) {
+    after(async () => {
+      for (const message of inserted) {
+        await runTranslation(message.id);
+      }
+    });
+  }
 
   return NextResponse.json({ ok: true, scanned, inserted: inserted.length });
 }

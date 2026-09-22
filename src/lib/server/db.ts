@@ -556,6 +556,17 @@ export async function listPending(limit = 10): Promise<Message[]> {
   return rows.map(toMessage);
 }
 
+/** Pending translations for one member, newest first — the translate-on-read set. */
+export async function listPendingForMember(memberId: string, limit = 50): Promise<Message[]> {
+  const sql = client();
+  const rows = (await sql.query(
+    `select ${MESSAGE_COLUMNS} from messages
+     where member_id = $1 and status = 'pending' and jp <> '' order by created_at desc limit $2`,
+    [memberId, limit],
+  )) as MessageRow[];
+  return rows.map(toMessage);
+}
+
 /* ── app_state ───────────────────────────────────────────────────────────── */
 
 export async function readState<T>(key: string): Promise<T | null> {

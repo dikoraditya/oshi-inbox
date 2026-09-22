@@ -259,6 +259,25 @@ export function useInbox() {
     });
   }, []);
 
+  /** Translate-on-read: translate a member's still-pending messages when opened. */
+  const translatePending = useCallback(
+    async (memberId: string) => {
+      try {
+        const { queued } = await api<{ queued: number }>("/api/translate", {
+          method: "POST",
+          body: JSON.stringify({ memberId }),
+        });
+        if (queued > 0) {
+          setTimeout(() => void refresh(), 4000);
+          setTimeout(() => void refresh(), 12000);
+        }
+      } catch {
+        // best-effort — the visibility poll still picks up any translations
+      }
+    },
+    [refresh],
+  );
+
   /** Pull the pure-REST sources on demand: one attribution key, or all when omitted. */
   const fetchSources = useCallback(
     async (key?: string): Promise<CosmFetchSummary> => {
@@ -333,6 +352,7 @@ export function useInbox() {
     retranslate,
     markRead,
     fetchSources,
+    translatePending,
     updateSettings,
   };
 }

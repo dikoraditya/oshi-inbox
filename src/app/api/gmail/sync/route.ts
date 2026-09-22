@@ -1,7 +1,7 @@
 import { after, NextResponse } from "next/server";
 
 import { ingestListenedSenders } from "@/lib/server/gmail";
-import { runTranslation } from "@/lib/server/pipeline";
+import { eagerTranslate, runTranslation } from "@/lib/server/pipeline";
 
 /**
  * Label-free, on-demand Gmail pull.
@@ -30,9 +30,11 @@ export async function POST(request: Request) {
       from: typeof body.from === "string" ? body.from : undefined,
     });
 
-    after(async () => {
-      for (const message of inserted) await runTranslation(message.id);
-    });
+    if (eagerTranslate()) {
+      after(async () => {
+        for (const message of inserted) await runTranslation(message.id);
+      });
+    }
 
     return NextResponse.json({ ok: true, scanned, inserted: inserted.length });
   } catch (error) {
