@@ -291,6 +291,21 @@ export function useInbox() {
     [refresh],
   );
 
+  /** Enqueue a browser source (Weverse/Nogizaka) for the linked poller to pull. */
+  const queueCollector = useCallback(
+    async (source: "weverse" | "nogizaka" | "all" = "all"): Promise<{ queued: string[] }> => {
+      const result = await api<{ ok: boolean; queued: string[] }>("/api/collector/queue", {
+        method: "POST",
+        body: JSON.stringify({ source }),
+      });
+      // The poller does the work asynchronously; pick results up over the next minute.
+      setTimeout(() => void refresh(), 15000);
+      setTimeout(() => void refresh(), 45000);
+      return { queued: result.queued };
+    },
+    [refresh],
+  );
+
   /** Roster: add a member. New members show in the inbox immediately, with no entries. */
   const addMember = useCallback(
     async (input: { name: string; group: string; source: Source }): Promise<Member> => {
@@ -353,6 +368,7 @@ export function useInbox() {
     markRead,
     fetchSources,
     translatePending,
+    queueCollector,
     updateSettings,
   };
 }

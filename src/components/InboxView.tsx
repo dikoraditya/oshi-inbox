@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 
 import { initialsOf } from "@/lib/text";
 import { SOURCES, type Member, type Message } from "@/lib/types";
@@ -48,6 +48,7 @@ export function InboxView({
   onSourceFilter,
   onOpen,
   onOpenUnassigned,
+  onSync,
 }: {
   members: Member[];
   messages: Message[];
@@ -61,6 +62,7 @@ export function InboxView({
   onSourceFilter: (value: SourceFilter) => void;
   onOpen: (memberId: string) => void;
   onOpenUnassigned: (messageId: string) => void;
+  onSync?: () => Promise<{ queued: string[] }>;
 }) {
   /** Latest message per member, for the one-line preview. */
   const latest = useMemo(() => {
@@ -112,12 +114,42 @@ export function InboxView({
       );
   }, [filtered, groups, latest]);
 
+
+  const [syncing, setSyncing] = useState(false);
+  const [syncNote, setSyncNote] = useState<string | null>(null);
+  async function runSync() {
+    if (!onSync) return;
+    setSyncing(true);
+    setSyncNote(null);
+    try {
+      const { queued } = await onSync();
+      setSyncNote(
+        queued.length ? `Queued ${queued.join(", ")} — pulling on your linked machine…` : "Nothing to sync.",
+      );
+    } catch (error) {
+      setSyncNote(error instanceof Error ? error.message : "Sync failed.");
+    } finally {
+      setSyncing(false);
+    }
+  }
   return (
     <>
       <div className="inbox-head">
         <div className="inbox-titlerow">
           <h1 className="inbox-title">Inbox</h1>
+          {onSync && (
+            <button
+              type="button"
+              className="btn btn-secondary"
+              disabled={syncing}
+              onClick={() => void runSync()}
+              title={syncNote ?? "Pull Weverse / Nogizaka via your linked collector"}
+            >
+              {syncing ? "Syncing…" : "Sync apps"}
+            </button>
+          )}
         </div>
+        {syncNote && <div className="drop-sub">{syncNote}</div>}
 
         <input
           className="input input--search"
