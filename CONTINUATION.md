@@ -127,6 +127,51 @@ for a fully local run with no cloud. Files: `Dockerfile`, `docker-compose.yml`,
   so `docker compose up` is unverified. YAML + idempotent SQL were reviewed;
   verify on a Docker host with the `logs db` check above.
 
+## SumoPod data + media migration (fully-local self-host)
+The self-host stack (`docker-compose.yml`) runs a **bundled Postgres** with media on
+a `media_data` volume — it does **not** read Neon/Blob. So a self-hosted box needs the
+data *and* the media files copied in; otherwise images 404 ("can't be opened") because
+the volume is empty. The one-time migration off cloud:
+
+1. **Normalise the source DB to fully-local URLs** (run once, from a machine whose
+   `public/media` holds every file — `npm run media:mirror-local` first if not):
+   ```bash
+   npm run media:mirror-local     # pull any Blob-only files down to public/media
+   npm run media:relink-local     # rewrite every Blob URL row -> /media/... (messages + avatars)
+   ```
+   After this the DB has **no** `…blob.vercel-storage.com` URLs — all `/media/…`.
+2. **Generate the two hand-off artifacts** (both git-ignored — `data.sql` holds private
+   DM text, the tarball is ~3.6 GB):
+   ```bash
+   npx tsx --env-file=.env.local scripts/dump-data.ts   # -> db/data.sql (groups+members+messages, ON CONFLICT DO UPDATE)
+   tar -czf media.tar.gz -C public media                # -> media.tar.gz (rooted at media/)
+   ```
+   `db:dump` uses `DATABASE_URL`; point it at the source DB. The dump upserts, so
+   re-loading **repairs** drifted rows (e.g. old Blob URLs) instead of skipping them.
+3. **Copy `db/data.sql` + `media.tar.gz` to the SumoPod host** (scp/upload), beside the
+   repo, with the compose stack up (`docker compose up -d --build`). Load both:
+   ```bash
+   # DB — schema + seed-groups already applied by the image's init hook on a fresh volume
+   docker compose exec -T db psql -U oshi -d oshi < db/data.sql
+
+   # Media — extract into the media_data volume. Confirm the volume name first:
+   docker volume ls        # expect <project>_media_data, e.g. oshi-inbox_media_data
+   docker run --rm -v oshi-inbox_media_data:/vol -v "$PWD":/src:ro \
+     alpine sh -c 'cd /vol && tar xzf /src/media.tar.gz --strip-components=1'
+   ```
+   `--strip-components=1` drops the tarball's top `media/` dir so files land at
+   `/vol/ingest/…` = the container's `/app/public/media/ingest/…`. Next serves them as
+   `/media/*` static files (range requests work → `<video>`/`<audio>` scrub).
+   Alternative without a helper container:
+   ```bash
+   docker compose cp media.tar.gz app:/tmp/media.tar.gz
+   docker compose exec app sh -c 'cd /app/public && tar xzf /tmp/media.tar.gz && rm /tmp/media.tar.gz'
+   ```
+4. **Verify**: open the app — every thumbnail/photo/video loads. Spot-check a `/media/…`
+   URL directly (e.g. `https://<host>/media/ingest/nogizaka-163253.jpeg`) returns 200.
+   Starting over from scratch: `docker compose down -v && docker compose up -d --build`
+   (re-applies schema + seed-groups on the fresh volume), then repeat steps 3.
+
 ## Sharing context across devices
 - **Data**: already shared — Neon Postgres + Vercel Blob are cloud. Same `.env.local` →
   same inbox on any machine. No sync needed.

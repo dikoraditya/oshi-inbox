@@ -8,6 +8,7 @@
     "start": "next start",
     "typecheck": "tsc --noEmit",
     "db:push": "tsx scripts/db-push.ts",
+    "db:dump": "tsx scripts/dump-data.ts",
     "db:seed-cosm": "tsx scripts/seed-cosm.ts",
     "db:seed-bstage": "tsx scripts/seed-bstage.ts",
     "media:mirror-local": "tsx scripts/mirror-blob.ts",
