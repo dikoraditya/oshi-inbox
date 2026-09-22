@@ -12,11 +12,13 @@ import type { Message } from "@/lib/types";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
+    const raw = new URL(request.url).searchParams.get("since");
+    const since = raw && Number.isFinite(Number(raw)) ? Number(raw) : undefined;
     const [members, messages, groups] = await Promise.all([
       listMembers(),
-      listMessages(),
+      listMessages(since),
       listGroups(),
     ]);
     return NextResponse.json({ members, messages, groups });

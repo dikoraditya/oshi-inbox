@@ -333,11 +333,16 @@ const MESSAGE_COLUMNS = `
   long, status, error, created_at, gmail_message_id, from_email, from_name
 `;
 
-export async function listMessages(): Promise<Message[]> {
+export async function listMessages(sinceMs?: number): Promise<Message[]> {
   const sql = client();
-  const rows = (await sql.query(
-    `select ${MESSAGE_COLUMNS} from messages order by created_at asc`,
-  )) as MessageRow[];
+  const rows = (
+    sinceMs
+      ? await sql.query(
+          `select ${MESSAGE_COLUMNS} from messages where created_at >= $1 order by created_at asc`,
+          [sinceMs],
+        )
+      : await sql.query(`select ${MESSAGE_COLUMNS} from messages order by created_at asc`)
+  ) as MessageRow[];
   return rows.map(toMessage);
 }
 

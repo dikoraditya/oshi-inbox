@@ -44,7 +44,7 @@ services:
       DB_DRIVER: pg
       # Media on the mounted volume, served by Next as /media/* static files.
       MEDIA_STORAGE: local
-      MEDIA_DIR: /app/public/media
+      MEDIA_DIR: /app/media
       # Security — required on a public URL.
       APP_PASSWORD: ${APP_PASSWORD:?set APP_PASSWORD in .env}
       CRON_SECRET: ${CRON_SECRET:?set CRON_SECRET in .env}
@@ -64,7 +64,7 @@ services:
       BSTAGE_EMAIL: ${BSTAGE_EMAIL:-}
       BSTAGE_PASSWORD: ${BSTAGE_PASSWORD:-}
     volumes:
-      - media_data:/app/public/media
+      - media_data:/app/media
 
 volumes:
   pg_data:

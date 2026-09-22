@@ -7,7 +7,7 @@ const nextConfig: NextConfig = {
   output: "standalone",
   // node-postgres is only loaded when DB_DRIVER selects it; keep it external so
   // Next never tries to bundle its optional native/driver requires.
-  serverExternalPackages: ["pg"],
+  serverExternalPackages: ["pg", "sharp"],
   async headers() {
     return [
       // The service worker controls the whole origin, so it must never be cached.

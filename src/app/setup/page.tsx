@@ -29,6 +29,10 @@ export default function SetupPage() {
   const [status, setStatus] = useState<Status | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [cosmKey, setCosmKey] = useState("");
+  const [cosmSet, setCosmSet] = useState(false);
+  const [cosmBusy, setCosmBusy] = useState(false);
+  const [cosmNote, setCosmNote] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     try {
@@ -41,12 +45,23 @@ export default function SetupPage() {
     }
   }, []);
 
+  const loadCosm = useCallback(async () => {
+    try {
+      const response = await fetch("/api/cosm/key");
+      const payload = await response.json();
+      setCosmSet(Boolean(payload.set));
+    } catch {
+      // non-fatal — the field still lets you set one
+    }
+  }, []);
+
   useEffect(() => {
     // Surface whatever the OAuth callback redirected back with.
     const params = new URLSearchParams(window.location.search);
     if (params.get("error")) setError(params.get("error"));
     void load();
-  }, [load]);
+    void loadCosm();
+  }, [load, loadCosm]);
 
   async function renew() {
     setBusy(true);
@@ -60,6 +75,27 @@ export default function SetupPage() {
       setError(failure instanceof Error ? failure.message : "Renewal failed.");
     } finally {
       setBusy(false);
+    }
+  }
+
+  async function saveCosmKey() {
+    setCosmBusy(true);
+    setCosmNote(null);
+    try {
+      const response = await fetch("/api/cosm/key", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ key: cosmKey }),
+      });
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload.error ?? "Could not save the key.");
+      setCosmSet(Boolean(payload.set));
+      setCosmKey("");
+      setCosmNote(payload.set ? "Saved." : "Cleared.");
+    } catch (failure) {
+      setCosmNote(failure instanceof Error ? failure.message : "Could not save the key.");
+    } finally {
+      setCosmBusy(false);
     }
   }
 
@@ -127,6 +163,34 @@ export default function SetupPage() {
               >
                 {busy ? "Renewing…" : "Renew watch"}
               </button>
+            </div>
+          </div>
+
+          <div className="field">
+            <div className="kicker">COSM (≒JOY / =LOVE / ≠ME)</div>
+            <Check ok={cosmSet}>{cosmSet ? "Verification key set" : "No verification key"}</Check>
+            <div className="drop-sub">
+              The x-request-verification-key rotates. Paste a fresh one from the LINK web portal
+              (DevTools → Network → any request header) when Fetch starts failing.
+            </div>
+            <input
+              className="input"
+              type="password"
+              placeholder="x-request-verification-key"
+              value={cosmKey}
+              aria-label="COSM verification key"
+              onChange={(event) => setCosmKey(event.target.value)}
+            />
+            <div className="chiprow">
+              <button
+                type="button"
+                className="btn btn-primary"
+                disabled={cosmBusy || !cosmKey.trim()}
+                onClick={() => void saveCosmKey()}
+              >
+                {cosmBusy ? "Saving…" : "Save key"}
+              </button>
+              {cosmNote && <span className="drop-sub">{cosmNote}</span>}
             </div>
           </div>
 

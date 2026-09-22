@@ -191,10 +191,11 @@ function decodeAccessToken(data: Uint8Array): string | null {
 }
 
 async function login(group: CosmGroup, uuid: string): Promise<string> {
-  const rvk = process.env.COSM_REQUEST_VERIFICATION_KEY?.trim();
+  const stored = (await readState<string>("cosm:rvk"))?.trim();
+  const rvk = stored || process.env.COSM_REQUEST_VERIFICATION_KEY?.trim();
   if (!rvk) {
     throw new Error(
-      "COSM_REQUEST_VERIFICATION_KEY is not set — copy the x-request-verification-key header from the LINK web portal (DevTools → Network).",
+      "COSM verification key is not set — paste the x-request-verification-key header (LINK portal → DevTools → Network) into Setup.",
     );
   }
   const body = Buffer.from([

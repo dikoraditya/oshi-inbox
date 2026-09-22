@@ -45,10 +45,13 @@ export function MessagePhoto({
     );
   }
 
+  // Local media routes through /media/[...], which resizes + re-encodes images;
+  // ask for the display width. External URLs (Blob/CDN avatars) pass through.
+  const src = url.startsWith("/media/") ? `${url}?w=1280` : url;
   return (
     <div className="msg-photo">
       {/* eslint-disable-next-line @next/next/no-img-element -- arbitrary Blob host */}
-      <img src={url} alt={`Screenshot from ${source}`} loading="lazy" />
+      <img src={src} alt={`Screenshot from ${source}`} loading="lazy" />
     </div>
   );
 }

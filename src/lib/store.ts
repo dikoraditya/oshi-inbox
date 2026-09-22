@@ -45,6 +45,9 @@ const LONG_THRESHOLD = 90;
 /** How often to look for newly ingested mail while the tab is in front. */
 const POLL_MS = 60_000;
 
+/** Cold-start paints only this recent window first, then backfills everything. */
+const RECENT_WINDOW_MS = 60 * 24 * 60 * 60 * 1000;
+
 async function api<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(path, {
     ...init,
@@ -72,20 +75,22 @@ export function useInbox() {
   /** Guards against overlapping refreshes from poll + focus + manual sync. */
   const refreshing = useRef(false);
 
-  const refresh = useCallback(async (): Promise<boolean> => {
+  const refresh = useCallback(async (sinceMs?: number): Promise<boolean> => {
     if (refreshing.current) return false;
     refreshing.current = true;
 
     try {
       const data = await api<{ members: Member[]; messages: Message[]; groups: string[] }>(
-        "/api/messages",
+        sinceMs ? `/api/messages?since=${sinceMs}` : "/api/messages",
       );
       setMembers(data.members);
       setMessages(data.messages);
       setGroups(data.groups ?? []);
       setOffline(false);
       setLoadError(null);
-      void writeSnapshot(data.members, data.messages, data.groups ?? []);
+      // Only the full payload seeds the cache; a windowed slice must not
+      // overwrite the complete snapshot the next cold start paints from.
+      if (!sinceMs) void writeSnapshot(data.members, data.messages, data.groups ?? []);
       return true;
     } catch (error) {
       // A failed refresh with a warm cache is degraded, not broken.
@@ -108,10 +113,15 @@ export function useInbox() {
         setMessages(cached.messages);
         setGroups(cached.groups ?? []);
         setReady(true);
+        await refresh();
+        return;
       }
 
-      await refresh();
+      // Cold start (fresh device, empty cache): paint a recent slice fast so the
+      // inbox is usable in a beat, then backfill the full history behind it.
+      await refresh(Date.now() - RECENT_WINDOW_MS);
       if (!cancelled) setReady(true);
+      await refresh();
     })();
 
     return () => {

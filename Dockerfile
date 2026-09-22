@@ -38,11 +38,12 @@ COPY --from=builder /app/public           ./public
 COPY docker/scheduler.mjs ./scheduler.mjs
 COPY docker/entrypoint.sh ./entrypoint.sh
 
-# public/media is where MEDIA_STORAGE=local writes; mount a volume here to persist
-# it across redeploys. Owned by the runtime user so writes succeed.
+# MEDIA_DIR (the mounted volume) is where MEDIA_STORAGE=local writes; .media-cache
+# holds the route's resized WebP variants. Both owned by the runtime user so
+# writes succeed. The media volume mounts over ./media at run time.
 RUN chmod +x ./entrypoint.sh \
- && mkdir -p ./public/media \
- && chown -R nextjs:nodejs ./public/media
+ && mkdir -p ./media ./.media-cache \
+ && chown -R nextjs:nodejs ./media ./.media-cache
 
 USER nextjs
 EXPOSE 3000
