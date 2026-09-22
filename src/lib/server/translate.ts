@@ -49,13 +49,13 @@ const GlossSchema = z.object({
   gloss: z.string().describe("Short English gloss, a few words at most"),
 });
 
-const TranslationSchema = z.object({
+export const TranslationSchema = z.object({
   romaji: z.string().describe("Full romaji transliteration, same sentence count as the source"),
   en: z.string().describe("Natural English translation, same sentence count as the source"),
-  words: z.array(GlossSchema).describe("Notable vocabulary worth glossing"),
+  words: z.array(GlossSchema).describe("At most 3 vocabulary items worth glossing"),
 });
 
-const SYSTEM = `You translate short messages that Japanese idols send to fans, for a reader who is learning Japanese.
+export const SYSTEM = `You translate short messages that Japanese idols send to fans, for a reader who is learning Japanese.
 
 Three rules govern the output:
 
@@ -67,9 +67,9 @@ Three rules govern the output:
 
 For romaji use Hepburn with macrons (ō, ū). Leave emoji in place in all three fields.
 
-Choose 1–6 words to gloss: the ones a learner would actually stumble on — kanji compounds, idioms, slang, clipped forms. Skip trivially common particles and greetings unless the form itself is unusual.`;
+Choose at most 3 words to gloss: the ones a learner would actually stumble on — kanji compounds, idioms, slang, clipped forms. Skip trivially common particles and greetings unless the form itself is unusual.`;
 
-function buildPrompt(jp: string): string {
+export function buildPrompt(jp: string): string {
   const count = splitJp(jp).length;
   const plural = count === 1 ? "" : "s";
   return [
