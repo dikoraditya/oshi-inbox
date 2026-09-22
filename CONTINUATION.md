@@ -172,6 +172,38 @@ the volume is empty. The one-time migration off cloud:
    Starting over from scratch: `docker compose down -v && docker compose up -d --build`
    (re-applies schema + seed-groups on the fresh volume), then repeat steps 3.
 
+### Live SumoPod run (2026-09-22) — done, with open follow-ups
+Ran against the live box (`ubuntu@43.134.3.198`, `/home/ubuntu/oshi-inbox`, compose:
+`app` + `db` postgres:18-alpine + `oshi-cf` cloudflared). **Finding:** the bundled
+Postgres already held the full dataset with every row already on `/media/…` (19 508
+messages, 0 Blob URLs) — so the `data.sql` load was **not** needed. The only gap was an
+**empty `media_data` volume (0 files)**, which 404'd every image. Fix applied:
+`scp media.tar.gz` (3.6 GB) → extract into `oshi-inbox_media_data` (2304 files) →
+`docker compose restart app`. Verified: 24/24 sampled URLs return 200 across
+COSM/Weverse/Nogizaka + all avatars, `image/jpeg` + `video/mp4` + `audio/mp4`, with
+`content-length` present (range/scrub works).
+
+**Open next steps:**
+1. **Runtime-added media needs an app restart (real bug for ongoing ingests).**
+   Next standalone caches the `public/` directory listing at boot: a file written to
+   the volume *after* the app started 404s until `docker compose restart app`
+   (probe-confirmed). So collector ingests to SumoPod land in the volume but won't
+   display until a restart. Durable fixes, pick one:
+   - **Serve `/media/[...]` from a Next route handler** that streams from `MEDIA_DIR`
+     with HTTP Range support — best; files serve dynamically, no restart ever. (The
+     static-serving comment in `src/lib/server/media.ts` becomes moot for self-host.)
+   - **Front `/media` with nginx/Caddy** reading the volume directly (bypasses Next).
+   - **Stopgap:** have `docker/scheduler.mjs` restart the app periodically / after a
+     collector run.
+2. **Public URL is ephemeral.** `oshi-cf` runs a Cloudflare *quick tunnel*
+   (`cloudflared tunnel --url http://app:3000`) → a random `*.trycloudflare.com` that
+   **changes every time that container restarts**. Find the current one:
+   `docker logs oshi-cf 2>&1 | grep -oE 'https://[a-z-]+\.trycloudflare\.com' | tail -1`.
+   For a stable address, switch to a **named tunnel** (Cloudflare token + a domain on
+   Cloudflare) wired into `docker-compose.yml`.
+3. **Deploy key** for SSH ops is in the box's `~/.ssh/authorized_keys` (comment
+   `oshi-deploy`). Remove when done: `sed -i '/oshi-deploy/d' ~/.ssh/authorized_keys`.
+
 ## Sharing context across devices
 - **Data**: already shared — Neon Postgres + Vercel Blob are cloud. Same `.env.local` →
   same inbox on any machine. No sync needed.
