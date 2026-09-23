@@ -1432,8 +1432,8 @@ button {
 }
 .kana-quiz-glyph {
   font-family: var(--font-jp);
-  font-size: 72px;
-  line-height: 1.1;
+  font-size: 120px;
+  line-height: 1.05;
   text-align: center;
   margin: 12px 0;
 }
