@@ -149,14 +149,14 @@ export default function Page() {
 
   const usable = store.ready && !(store.loadError && store.messages.length === 0);
 
-  // Daily kana warm-up: once passed today, skip until tomorrow.
+  // Kana warm-up: re-gate every 12 hours (so it's at least twice a day).
   const [kanaPassed, setKanaPassed] = useState(false);
   useEffect(() => {
-    const key = `oshi_kana_${new Date().toISOString().slice(0, 10)}`;
-    if (localStorage.getItem(key)) setKanaPassed(true);
+    const ts = Number(localStorage.getItem("oshi_kana_pass"));
+    if (ts && Date.now() - ts < 12 * 60 * 60 * 1000) setKanaPassed(true);
   }, []);
   function passKana() {
-    localStorage.setItem(`oshi_kana_${new Date().toISOString().slice(0, 10)}`, "1");
+    localStorage.setItem("oshi_kana_pass", String(Date.now()));
     setKanaPassed(true);
   }
   const showApp = usable && kanaPassed;

@@ -638,6 +638,24 @@ export async function gradeLearn(word: string, rating: "again" | "good" | "easy"
   `;
 }
 
+/** Mark many words known at once (e.g. a WaniKani sync). Chunked upsert. */
+export async function markKnownBulk(words: string[]): Promise<number> {
+  if (!words.length) return 0;
+  const sql = client();
+  let total = 0;
+  for (let i = 0; i < words.length; i += 500) {
+    const chunk = words.slice(i, i + 500);
+    const values = chunk.map((_, j) => `($${j + 1}, 'known')`).join(", ");
+    await sql.query(
+      `insert into learn_words (word, status) values ${values}
+       on conflict (word) do update set status = 'known', updated_at = now()`,
+      chunk,
+    );
+    total += chunk.length;
+  }
+  return total;
+}
+
 /* ── app_state ───────────────────────────────────────────────────────────── */
 
 export async function readState<T>(key: string): Promise<T | null> {
