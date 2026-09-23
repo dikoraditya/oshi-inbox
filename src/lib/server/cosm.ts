@@ -322,7 +322,9 @@ function mapMessages(group: CosmGroup, roomId: number, decoded: CosmMessage[]): 
       source: group.source,
       attributionKey: `cosm:${roomId}`,
       senderName: m.postedUsername ?? "",
-      jp: m.textContent ?? "",
+      // Voice notes carry the literal label "ボイス投稿"; drop it so it's a media-
+      // only row (no pointless "Voice post" translation).
+      jp: mediaType === "audio" ? "" : (m.textContent ?? ""),
       time: displayTime(createdAt, now),
       createdAt,
       imageUrl: url,

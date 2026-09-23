@@ -124,7 +124,7 @@ export function InboxView({
     try {
       const { queued } = await onSync();
       setSyncNote(
-        queued.length ? `Queued ${queued.join(", ")} — pulling on your linked machine…` : "Nothing to sync.",
+        `Fetching ≒JOY/NMB now; ${queued.length ? `queued ${queued.join(", ")}` : "queued browser sources"} for your linked machine.`,
       );
     } catch (error) {
       setSyncNote(error instanceof Error ? error.message : "Sync failed.");

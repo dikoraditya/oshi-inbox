@@ -176,7 +176,7 @@ export default function Page() {
               setAssigningId(messageId);
               setView("assign");
             }}
-            onSync={() => store.queueCollector("all")}
+            onSync={() => store.syncAll()}
           />
         )}
 

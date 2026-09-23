@@ -306,6 +306,14 @@ export function useInbox() {
     [refresh],
   );
 
+  /** One-tap sync: fetch server-side sources (COSM/NMB) and queue the browser ones. */
+  const syncAll = useCallback(async (): Promise<{ queued: string[] }> => {
+    // COSM/NMB run server-side and can take ~a minute; fire without blocking the
+    // button — the refresh/poll surfaces results. Browser sources go to the queue.
+    void fetchSources().catch(() => {});
+    return queueCollector("all");
+  }, [fetchSources, queueCollector]);
+
   /** Roster: add a member. New members show in the inbox immediately, with no entries. */
   const addMember = useCallback(
     async (input: { name: string; group: string; source: Source }): Promise<Member> => {
@@ -369,6 +377,7 @@ export function useInbox() {
     fetchSources,
     translatePending,
     queueCollector,
+    syncAll,
     updateSettings,
   };
 }
