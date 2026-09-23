@@ -26,7 +26,8 @@ async function wkGet<T>(url: string, token: string): Promise<T> {
 /** Kanji + vocab strings the user has reached Guru+ (srs stages 5–9). */
 export async function fetchWaniKaniKnown(token: string): Promise<string[]> {
   const subjectIds: number[] = [];
-  let url: string | null = `${WK}/assignments?srs_stages=5,6,7,8,9`;
+  // All started items (Apprentice 1–4 through Burned 9) count as "known" here.
+  let url: string | null = `${WK}/assignments?srs_stages=1,2,3,4,5,6,7,8,9`;
   while (url) {
     const page: WkPage<WkAssignment> = await wkGet(url, token);
     for (const a of page.data) subjectIds.push(a.data.subject_id);
