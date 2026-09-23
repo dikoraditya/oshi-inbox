@@ -10,6 +10,7 @@ import { RosterView } from "@/components/RosterView";
 import { StatisticsView } from "@/components/StatisticsView";
 import { TabBar, type TabKey } from "@/components/TabBar";
 import { ThreadView } from "@/components/ThreadView";
+import { KanaGate } from "@/components/KanaGate";
 import { useInbox, type Draft } from "@/lib/store";
 
 type View = "inbox" | "thread" | "statistics" | "editor" | "assign" | "roster" | "member-edit";
@@ -141,6 +142,18 @@ export default function Page() {
 
   const usable = store.ready && !(store.loadError && store.messages.length === 0);
 
+  // Daily kana warm-up: once passed today, skip until tomorrow.
+  const [kanaPassed, setKanaPassed] = useState(false);
+  useEffect(() => {
+    const key = `oshi_kana_${new Date().toISOString().slice(0, 10)}`;
+    if (localStorage.getItem(key)) setKanaPassed(true);
+  }, []);
+  function passKana() {
+    localStorage.setItem(`oshi_kana_${new Date().toISOString().slice(0, 10)}`, "1");
+    setKanaPassed(true);
+  }
+  const showApp = usable && kanaPassed;
+
   return (
     <main className="stage">
       <div className="phone">
@@ -160,7 +173,9 @@ export default function Page() {
           </div>
         )}
 
-        {usable && view === "inbox" && (
+        {usable && !kanaPassed && <KanaGate onPass={passKana} />}
+
+        {showApp && view === "inbox" && (
           <InboxView
             members={store.members}
             messages={store.messages}
@@ -180,7 +195,7 @@ export default function Page() {
           />
         )}
 
-        {usable && view === "thread" && (
+        {showApp && view === "thread" && (
           <ThreadView
             member={activeMember}
             messages={threadMessages}
@@ -202,7 +217,7 @@ export default function Page() {
           />
         )}
 
-        {usable && view === "member-edit" && activeMember && (
+        {showApp && view === "member-edit" && activeMember && (
           <MemberEditView
             member={activeMember}
             onCancel={() => setView("thread")}
@@ -210,7 +225,7 @@ export default function Page() {
           />
         )}
 
-        {usable && view === "roster" && (
+        {showApp && view === "roster" && (
           <RosterView
             members={store.members}
             messages={store.messages}
@@ -221,11 +236,11 @@ export default function Page() {
           />
         )}
 
-        {usable && view === "statistics" && (
+        {showApp && view === "statistics" && (
           <StatisticsView members={store.members} messages={store.messages} groups={store.groups} />
         )}
 
-        {usable && view === "assign" && assigningMessage && (
+        {showApp && view === "assign" && assigningMessage && (
           <AssignView
             message={assigningMessage}
             members={store.members}
@@ -237,7 +252,7 @@ export default function Page() {
           />
         )}
 
-        {usable && view === "editor" && (
+        {showApp && view === "editor" && (
           <EditorView
             members={store.members}
             editing={editingMessage}
@@ -251,7 +266,7 @@ export default function Page() {
           />
         )}
 
-        <TabBar active={activeTab} onPick={onTab} />
+        {showApp && <TabBar active={activeTab} onPick={onTab} />}
       </div>
     </main>
   );

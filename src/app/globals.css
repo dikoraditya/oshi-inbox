@@ -1402,3 +1402,62 @@ button {
   color: var(--ink-70);
   margin-top: 3px;
 }
+
+/* ── Kana warm-up gate ──────────────────────────────────────────────────── */
+.kana-grid {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 4px;
+  margin-top: 8px;
+}
+.kana-cell {
+  border: 1px solid var(--color-divider);
+  padding: 6px 2px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+.kana-cell--empty {
+  border-color: transparent;
+}
+.kana-glyph {
+  font-family: var(--font-jp);
+  font-size: 20px;
+  line-height: 1;
+}
+.kana-romaji {
+  font-size: 10px;
+  color: color-mix(in srgb, var(--color-text) 55%, transparent);
+}
+.kana-quiz-glyph {
+  font-family: var(--font-jp);
+  font-size: 72px;
+  line-height: 1.1;
+  text-align: center;
+  margin: 12px 0;
+}
+.kana-quiz-opts {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+.kana-opt {
+  border: 1px solid var(--color-text);
+  background: var(--color-bg);
+  padding: 12px;
+  font-family: var(--font-heading);
+  font-weight: 800;
+  font-size: 16px;
+  cursor: pointer;
+}
+.kana-opt[data-state="correct"] {
+  background: var(--color-accent);
+  color: var(--color-bg);
+  border-color: var(--color-accent);
+}
+.kana-opt[data-state="wrong"] {
+  background: var(--color-surface);
+  color: color-mix(in srgb, var(--color-text) 45%, transparent);
+  text-decoration: line-through;
+}
