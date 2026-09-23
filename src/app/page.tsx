@@ -8,12 +8,13 @@ import { MemberEditView } from "@/components/MemberEditView";
 import { InboxView, type GroupFilter, type SourceFilter } from "@/components/InboxView";
 import { RosterView } from "@/components/RosterView";
 import { StatisticsView } from "@/components/StatisticsView";
+import { ReviewView } from "@/components/ReviewView";
 import { TabBar, type TabKey } from "@/components/TabBar";
 import { ThreadView } from "@/components/ThreadView";
 import { KanaGate } from "@/components/KanaGate";
 import { useInbox, type Draft } from "@/lib/store";
 
-type View = "inbox" | "thread" | "statistics" | "editor" | "assign" | "roster" | "member-edit";
+type View = "inbox" | "thread" | "statistics" | "editor" | "assign" | "roster" | "member-edit" | "review";
 
 /** The mock status bar completes the phone frame on desktop; the clock is real. */
 function StatusBar({ offline }: { offline: boolean }) {
@@ -96,6 +97,10 @@ export default function Page() {
       setView("roster");
       return;
     }
+    if (key === "study") {
+      setView("review");
+      return;
+    }
     if (key === "thread") {
       // Reading needs a subject; fall back to the first member with a thread.
       const fallback =
@@ -138,7 +143,9 @@ export default function Page() {
         ? "thread"
         : view === "roster"
           ? "roster"
-          : "inbox";
+          : view === "review"
+            ? "study"
+            : "inbox";
 
   const usable = store.ready && !(store.loadError && store.messages.length === 0);
 
@@ -214,7 +221,14 @@ export default function Page() {
                 : undefined
             }
             onEditProfile={() => setView("member-edit")}
+            knownWords={store.knownWords}
+            onKnow={store.markKnown}
+            onStudy={store.saveForReview}
           />
+        )}
+
+        {showApp && view === "review" && (
+          <ReviewView cards={store.dueCards} onGrade={store.gradeCard} onBack={() => setView("inbox")} />
         )}
 
         {showApp && view === "member-edit" && activeMember && (

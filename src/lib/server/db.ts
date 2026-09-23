@@ -3,7 +3,7 @@ import "server-only";
 import { createSql } from "./sql";
 import { randomUUID } from "node:crypto";
 
-import type { Gloss, MediaType, Member, Message, Source, TranslationStatus } from "@/lib/types";
+import type { Gloss, LearnCard, MediaType, Member, Message, Source, TranslationStatus } from "@/lib/types";
 
 /**
  * Server-side data access.
@@ -565,6 +565,77 @@ export async function listPendingForMember(memberId: string, limit = 50): Promis
     [memberId, limit],
   )) as MessageRow[];
   return rows.map(toMessage);
+}
+
+/* ── learning (known words + SRS deck) ────────────────────────────────────── */
+
+export async function listLearn(): Promise<{ known: string[]; due: LearnCard[] }> {
+  const sql = client();
+  const knownRows = (await sql`select word from learn_words where status = 'known'`) as Array<{
+    word: string;
+  }>;
+  const dueRows = (await sql.query(
+    `select word, reading, gloss, due from learn_words
+     where status = 'learning' and due <= $1 order by due asc limit 50`,
+    [Date.now()],
+  )) as Array<{ word: string; reading: string; gloss: string; due: string | number }>;
+  return {
+    known: knownRows.map((r) => r.word),
+    due: dueRows.map((r) => ({ word: r.word, reading: r.reading, gloss: r.gloss, due: Number(r.due) })),
+  };
+}
+
+export async function setKnown(word: string, reading: string, gloss: string): Promise<void> {
+  const sql = client();
+  await sql`
+    insert into learn_words (word, reading, gloss, status)
+    values (${word}, ${reading}, ${gloss}, 'known')
+    on conflict (word) do update set status = 'known', updated_at = now()
+  `;
+}
+
+export async function startLearning(word: string, reading: string, gloss: string): Promise<void> {
+  const sql = client();
+  await sql`
+    insert into learn_words (word, reading, gloss, status, due)
+    values (${word}, ${reading}, ${gloss}, 'learning', ${Date.now()})
+    on conflict (word) do update set status = 'learning',
+      reading = excluded.reading, gloss = excluded.gloss, updated_at = now()
+  `;
+}
+
+export async function gradeLearn(word: string, rating: "again" | "good" | "easy"): Promise<void> {
+  const sql = client();
+  const rows = (await sql`
+    select ease, interval_days, reps from learn_words where word = ${word}
+  `) as Array<{ ease: number; interval_days: number; reps: number }>;
+  if (!rows.length) return;
+
+  let ease = Number(rows[0].ease);
+  let interval = Number(rows[0].interval_days);
+  let reps = Number(rows[0].reps);
+  const now = Date.now();
+  let due: number;
+
+  if (rating === "again") {
+    ease = Math.max(1.3, ease - 0.2);
+    reps = 0;
+    interval = 0;
+    due = now + 60_000; // ~a minute — resurfaces this session
+  } else {
+    reps += 1;
+    if (rating === "easy") ease += 0.15;
+    if (reps === 1) interval = rating === "easy" ? 4 : 1;
+    else if (reps === 2) interval = 6;
+    else interval = Math.max(1, Math.round(interval * ease));
+    due = now + interval * 86_400_000;
+  }
+
+  await sql`
+    update learn_words
+    set ease = ${ease}, interval_days = ${interval}, reps = ${reps}, due = ${due}, updated_at = now()
+    where word = ${word}
+  `;
 }
 
 /* ── app_state ───────────────────────────────────────────────────────────── */

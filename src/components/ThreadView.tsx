@@ -72,6 +72,9 @@ const MessageCard = memo(function MessageCard({
   onPickWord,
   onEdit,
   onRetry,
+  knownWords,
+  onKnow,
+  onStudy,
 }: {
   message: Message;
   member: Member;
@@ -82,6 +85,9 @@ const MessageCard = memo(function MessageCard({
   onPickWord: (id: string) => void;
   onEdit: (messageId: string) => void;
   onRetry: (messageId: string) => void;
+  knownWords: Set<string>;
+  onKnow: (word: string, reading: string, gloss: string) => void;
+  onStudy: (word: string, reading: string, gloss: string) => void;
 }) {
   const [showEn, setShowEn] = useState<boolean | null>(null);
   const [expanded, setExpanded] = useState(false);
@@ -154,11 +160,33 @@ const MessageCard = memo(function MessageCard({
                             <span className="pop" role="tooltip">
                               <span className="pop-romaji">{part.gloss.romaji}</span>
                               <span className="pop-gloss">{part.gloss.gloss}</span>
+                              <span className="pop-actions">
+                                <button
+                                  type="button"
+                                  className="pop-act"
+                                  onClick={(event) => {
+                                    event.stopPropagation();
+                                    onKnow(part.gloss.jp, part.gloss.romaji, part.gloss.gloss);
+                                  }}
+                                >
+                                  Know
+                                </button>
+                                <button
+                                  type="button"
+                                  className="pop-act"
+                                  onClick={(event) => {
+                                    event.stopPropagation();
+                                    onStudy(part.gloss.jp, part.gloss.romaji, part.gloss.gloss);
+                                  }}
+                                >
+                                  Study
+                                </button>
+                              </span>
                             </span>
                           )}
                           <button
                             type="button"
-                            className="word"
+                            className={knownWords.has(part.text) ? "word word--known" : "word"}
                             aria-expanded={open}
                             onClick={(event) => {
                               // Otherwise the row's own handler would also fire.
@@ -269,6 +297,9 @@ export function ThreadView({
   onRetry,
   onFetch,
   onEditProfile,
+  knownWords,
+  onKnow,
+  onStudy,
 }: {
   member: Member | null;
   messages: Message[];
@@ -280,6 +311,9 @@ export function ThreadView({
   onFetch?: () => Promise<CosmFetchSummary>;
   /** Open the Edit Profile screen for this member. */
   onEditProfile?: () => void;
+  knownWords: Set<string>;
+  onKnow: (word: string, reading: string, gloss: string) => void;
+  onStudy: (word: string, reading: string, gloss: string) => void;
 }) {
   // One selection at a time across the whole thread, as the design had it.
   const [activeSentence, setActiveSentence] = useState<string | null>(null);
@@ -418,6 +452,9 @@ export function ThreadView({
               onPickWord={pickWord}
               onEdit={onEdit}
               onRetry={onRetry}
+              knownWords={knownWords}
+              onKnow={onKnow}
+              onStudy={onStudy}
             />
           );
         })}

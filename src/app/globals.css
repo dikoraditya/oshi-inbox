@@ -1461,3 +1461,41 @@ button {
   color: color-mix(in srgb, var(--color-text) 45%, transparent);
   text-decoration: line-through;
 }
+
+/* ── Learning: gloss actions, known words, review deck ──────────────────── */
+.pop-actions {
+  display: flex;
+  gap: 6px;
+  margin-top: 6px;
+}
+.pop-act {
+  border: 1px solid var(--color-bg);
+  background: transparent;
+  color: var(--color-bg);
+  font-size: 10px;
+  text-transform: uppercase;
+  padding: 2px 6px;
+  cursor: pointer;
+}
+.word--known {
+  border-bottom-color: transparent;
+  opacity: 0.7;
+}
+.review-card {
+  text-align: center;
+}
+.review-word {
+  font-family: var(--font-jp);
+  font-size: 56px;
+  line-height: 1.2;
+  margin: 16px 0;
+}
+.review-reading {
+  font-size: 20px;
+  margin-bottom: 6px;
+}
+.review-gloss {
+  font-size: 15px;
+  color: color-mix(in srgb, var(--color-text) 70%, transparent);
+  margin-bottom: 14px;
+}

@@ -95,3 +95,16 @@ create table if not exists app_state (
   value      jsonb       not null,
   updated_at timestamptz not null default now()
 );
+
+-- Learning layer: known-word set + a small SM-2 spaced-repetition deck.
+create table if not exists learn_words (
+  word          text primary key,
+  reading       text not null default '',
+  gloss         text not null default '',
+  status        text not null default 'learning',
+  ease          real not null default 2.5,
+  interval_days integer not null default 0,
+  due           bigint not null default 0,
+  reps          integer not null default 0,
+  updated_at    timestamptz not null default now()
+);

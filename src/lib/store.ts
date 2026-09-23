@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { readSnapshot, writeSnapshot } from "./cache";
-import type { Member, Message, Settings, Source } from "./types";
+import type { LearnCard, Member, Message, Settings, Source } from "./types";
 import { DEFAULT_SETTINGS } from "./types";
 
 /**
@@ -314,6 +314,51 @@ export function useInbox() {
     return queueCollector("all");
   }, [fetchSources, queueCollector]);
 
+  /* ── learning layer: known words + SRS deck ─────────────────────────────── */
+  const [knownWords, setKnownWords] = useState<Set<string>>(new Set());
+  const [dueCards, setDueCards] = useState<LearnCard[]>([]);
+
+  const refreshLearn = useCallback(async () => {
+    try {
+      const data = await api<{ known: string[]; due: LearnCard[] }>("/api/learn");
+      setKnownWords(new Set(data.known));
+      setDueCards(data.due);
+    } catch {
+      // best-effort — learning data is non-critical
+    }
+  }, []);
+
+  useEffect(() => {
+    void refreshLearn();
+  }, [refreshLearn]);
+
+  const markKnown = useCallback(async (word: string, reading: string, gloss: string) => {
+    setKnownWords((current) => new Set(current).add(word));
+    await api("/api/learn", {
+      method: "POST",
+      body: JSON.stringify({ word, reading, gloss, action: "known" }),
+    }).catch(() => {});
+  }, []);
+
+  const saveForReview = useCallback(
+    async (word: string, reading: string, gloss: string) => {
+      await api("/api/learn", {
+        method: "POST",
+        body: JSON.stringify({ word, reading, gloss, action: "study" }),
+      }).catch(() => {});
+      void refreshLearn();
+    },
+    [refreshLearn],
+  );
+
+  const gradeCard = useCallback(async (word: string, rating: "again" | "good" | "easy") => {
+    setDueCards((cards) => cards.filter((c) => c.word !== word));
+    await api("/api/learn", {
+      method: "POST",
+      body: JSON.stringify({ word, action: "grade", rating }),
+    }).catch(() => {});
+  }, []);
+
   /** Roster: add a member. New members show in the inbox immediately, with no entries. */
   const addMember = useCallback(
     async (input: { name: string; group: string; source: Source }): Promise<Member> => {
@@ -378,6 +423,11 @@ export function useInbox() {
     translatePending,
     queueCollector,
     syncAll,
+    knownWords,
+    dueCards,
+    markKnown,
+    saveForReview,
+    gradeCard,
     updateSettings,
   };
 }

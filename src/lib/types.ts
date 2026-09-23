@@ -117,6 +117,14 @@ export interface Message {
   fromName?: string | null;
 }
 
+/** A spaced-repetition card / known-word entry surfaced to the client. */
+export interface LearnCard {
+  word: string;
+  reading: string;
+  gloss: string;
+  due: number;
+}
+
 /** User-tunable reading settings — the two props the design canvas exposed. */
 export interface Settings {
   /** Show the English block without being asked. Design default: false. */
