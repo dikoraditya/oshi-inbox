@@ -188,7 +188,16 @@ export default function Page() {
             onBack={() => setView("inbox")}
             onEdit={(messageId) => openEditor(messageId)}
             onRetry={(messageId) => void store.retranslate(messageId)}
-            onFetch={activeFetchKey ? () => store.fetchSources(activeFetchKey) : undefined}
+            onFetch={
+              activeFetchKey && activeMember
+                ? async () => {
+                    const result = await store.fetchSources(activeFetchKey);
+                    // Translate what we just pulled (lazy mode won't otherwise until re-open).
+                    void store.translatePending(activeMember.id);
+                    return result;
+                  }
+                : undefined
+            }
             onEditProfile={() => setView("member-edit")}
           />
         )}
