@@ -1499,3 +1499,31 @@ button {
   color: color-mix(in srgb, var(--color-text) 70%, transparent);
   margin-bottom: 14px;
 }
+
+.newword {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 7px 0;
+  border-bottom: 1px solid var(--color-divider);
+}
+.newword-jp {
+  font-family: var(--font-jp);
+  font-size: 16px;
+}
+.newword-ro {
+  font-size: 11px;
+  color: color-mix(in srgb, var(--color-text) 55%, transparent);
+}
+.newword-gloss {
+  font-size: 12px;
+  flex: 1;
+}
+.newword-acts {
+  display: flex;
+  gap: 4px;
+}
+.pop-act--ink {
+  border-color: var(--color-text);
+  color: var(--color-text);
+}

@@ -64,6 +64,20 @@ export default function Page() {
     [store.messages, activeMemberId],
   );
 
+  // Glossed vocab you've seen but not yet marked known — the "new words" queue.
+  const newWords = useMemo(() => {
+    const seen = new Set<string>();
+    const out: { jp: string; romaji: string; gloss: string }[] = [];
+    for (const message of store.messages) {
+      for (const word of message.words) {
+        if (!word.jp || seen.has(word.jp)) continue;
+        seen.add(word.jp);
+        if (!store.knownWords.has(word.jp)) out.push({ jp: word.jp, romaji: word.romaji, gloss: word.gloss });
+      }
+    }
+    return out;
+  }, [store.messages, store.knownWords]);
+
   // Members of a pure-REST source carry a "cosm:<room>" or "bstage:<circle>"
   // attribution key; that gates the Fetch UI.
   const FETCH_PREFIXES = ["cosm:", "bstage:"];
@@ -228,7 +242,15 @@ export default function Page() {
         )}
 
         {showApp && view === "review" && (
-          <ReviewView cards={store.dueCards} onGrade={store.gradeCard} onBack={() => setView("inbox")} />
+          <ReviewView
+            cards={store.dueCards}
+            newWords={newWords}
+            knownCount={store.knownWords.size}
+            onGrade={store.gradeCard}
+            onStudy={store.saveForReview}
+            onKnow={store.markKnown}
+            onBack={() => setView("inbox")}
+          />
         )}
 
         {showApp && view === "member-edit" && activeMember && (
