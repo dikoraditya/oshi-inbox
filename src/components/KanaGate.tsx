@@ -62,13 +62,21 @@ function groupsFrom(script: string, rows: Kana[][]): Group[] {
   return rows.map((cells) => ({ title: `${script} · ${cells.map((c) => c.k).join(" ")}`, cells }));
 }
 
-const GROUPS: Group[] = [
+const H_GROUPS: Group[] = [
   ...groupsFrom("Hiragana", H_GOJUON),
   ...groupsFrom("Hiragana combos", H_COMBOS),
+];
+const K_GROUPS: Group[] = [
   ...groupsFrom("Katakana", toKatakana(H_GOJUON)),
   ...groupsFrom("Katakana combos", toKatakana(H_COMBOS)),
 ];
-const ALL: Kana[] = GROUPS.flatMap((g) => g.cells);
+
+type Scope = "hiragana" | "katakana" | "all";
+const SCOPES: Record<Scope, { label: string; groups: Group[] }> = {
+  hiragana: { label: "Hiragana", groups: H_GROUPS },
+  katakana: { label: "Katakana", groups: K_GROUPS },
+  all: { label: "All", groups: [...H_GROUPS, ...K_GROUPS] },
+};
 
 /** Accept common romaji variants (Kunrei/typing shortcuts) → the canonical form. */
 const ROMAJI_ALT: Record<string, string> = {
@@ -172,13 +180,16 @@ function Table({ title, rows }: { title: string; rows: Kana[][] }) {
 }
 
 export function KanaGate({ onPass }: { onPass: () => void }) {
+  const [scope, setScope] = useState<Scope>("all");
   const [phase, setPhase] = useState<"start" | "learn" | "final" | "done">("start");
   const [groupIndex, setGroupIndex] = useState(0);
   const [sub, setSub] = useState<"study" | "drill">("study");
   const kata = useMemo(() => toKatakana(H_GOJUON), []);
+  const groups = SCOPES[scope].groups;
+  const fullSet = useMemo(() => groups.flatMap((g) => g.cells), [groups]);
 
   function nextGroup() {
-    if (groupIndex + 1 < GROUPS.length) {
+    if (groupIndex + 1 < groups.length) {
       setGroupIndex(groupIndex + 1);
       setSub("study");
     } else {
@@ -190,7 +201,7 @@ export function KanaGate({ onPass }: { onPass: () => void }) {
     <div className="scroll editor-scroll">
       <div className="field">
         <h1 className="inbox-title">Warm-up</h1>
-        <div className="drop-sub">Learn a few at a time, then clear the full typed quiz to open your inbox.</div>
+        <div className="drop-sub">Learn a few at a time, then clear the typed quiz to open your inbox.</div>
       </div>
 
       {phase === "start" && (
@@ -198,13 +209,26 @@ export function KanaGate({ onPass }: { onPass: () => void }) {
           <Table title="Hiragana ひらがな" rows={H_GOJUON} />
           <Table title="Katakana カタカナ" rows={kata} />
           <div className="field">
+            <div className="kicker">Choose a set</div>
+            <div className="chiprow">
+              {(["hiragana", "katakana", "all"] as Scope[]).map((s) => (
+                <button
+                  key={s}
+                  type="button"
+                  className={`btn ${scope === s ? "btn-primary" : "btn-secondary"}`}
+                  onClick={() => { setScope(s); setGroupIndex(0); }}
+                >
+                  {SCOPES[s].label}
+                </button>
+              ))}
+            </div>
             <div className="drop-sub">Combos (きゃ, しゃ, …) are included in the drills.</div>
             <div className="chiprow">
               <button type="button" className="btn btn-secondary" onClick={() => { setGroupIndex(0); setSub("study"); setPhase("learn"); }}>
                 Learn by 5
               </button>
               <button type="button" className="btn btn-primary" onClick={() => setPhase("final")}>
-                Quiz all → unlock
+                Quiz {SCOPES[scope].label} → unlock
               </button>
             </div>
           </div>
@@ -214,10 +238,10 @@ export function KanaGate({ onPass }: { onPass: () => void }) {
       {phase === "learn" && sub === "study" && (
         <div className="field">
           <div className="kicker">
-            {GROUPS[groupIndex].title} · {groupIndex + 1}/{GROUPS.length}
+            {groups[groupIndex].title} · {groupIndex + 1}/{groups.length}
           </div>
           <div className="kana-grid">
-            {GROUPS[groupIndex].cells.map((cell, i) => (
+            {groups[groupIndex].cells.map((cell, i) => (
               <div key={i} className="kana-cell">
                 <span className="kana-glyph" lang="ja">
                   {cell.k}
@@ -230,6 +254,9 @@ export function KanaGate({ onPass }: { onPass: () => void }) {
             <button type="button" className="btn btn-primary" onClick={() => setSub("drill")}>
               Quiz these
             </button>
+            <button type="button" className="btn btn-secondary" onClick={nextGroup}>
+              Next 5 →
+            </button>
             <button type="button" className="btn btn-secondary" onClick={() => setPhase("final")}>
               Skip to full quiz
             </button>
@@ -239,15 +266,20 @@ export function KanaGate({ onPass }: { onPass: () => void }) {
 
       {phase === "learn" && sub === "drill" && (
         <Drill
-          key={`g${groupIndex}`}
-          set={GROUPS[groupIndex].cells}
-          label={GROUPS[groupIndex].title}
+          key={`g${scope}${groupIndex}`}
+          set={groups[groupIndex].cells}
+          label={groups[groupIndex].title}
           onComplete={nextGroup}
         />
       )}
 
       {phase === "final" && (
-        <Drill key="final" set={ALL} label="Full quiz" onComplete={() => setPhase("done")} />
+        <Drill
+          key={`final${scope}`}
+          set={fullSet}
+          label={`${SCOPES[scope].label} quiz`}
+          onComplete={() => setPhase("done")}
+        />
       )}
 
       {phase === "done" && (
@@ -256,6 +288,14 @@ export function KanaGate({ onPass }: { onPass: () => void }) {
           <div className="kana-quiz-glyph">✓</div>
           <button type="button" className="btn btn-primary" onClick={onPass}>
             Open inbox
+          </button>
+        </div>
+      )}
+
+      {phase !== "done" && (
+        <div className="field">
+          <button type="button" className="btn btn-secondary" onClick={onPass}>
+            Skip warm-up →
           </button>
         </div>
       )}
