@@ -306,13 +306,18 @@ export function useInbox() {
     [refresh],
   );
 
-  /** One-tap sync: fetch server-side sources (COSM/NMB) and queue the browser ones. */
+  /** One-tap sync: fetch the server-side sources (COSM/NMB/Nogizaka/Gmail) and queue Weverse. */
   const syncAll = useCallback(async (): Promise<{ queued: string[] }> => {
-    // COSM/NMB run server-side and can take ~a minute; fire without blocking the
-    // button — the refresh/poll surfaces results. Browser sources go to the queue.
+    // COSM/NMB/Nogizaka run server-side and can take ~a minute; fire without
+    // blocking the button — the refresh/poll surfaces results. Weverse still needs
+    // a real logged-in browser, so it goes to the collector queue.
     void fetchSources().catch(() => {});
-    return queueCollector("all");
-  }, [fetchSources, queueCollector]);
+    // Gmail (AKB mobame) is server-side once connected; fire-and-forget, then refresh.
+    void api("/api/gmail/sync", { method: "POST", body: JSON.stringify({ days: 7 }) })
+      .then(() => refresh())
+      .catch(() => {});
+    return queueCollector("weverse");
+  }, [fetchSources, queueCollector, refresh]);
 
   /* ── learning layer: known words + SRS deck ─────────────────────────────── */
   const [knownWords, setKnownWords] = useState<Set<string>>(new Set());

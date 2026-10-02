@@ -124,7 +124,7 @@ export function InboxView({
     try {
       const { queued } = await onSync();
       setSyncNote(
-        `Fetching ≒JOY/NMB now; ${queued.length ? `queued ${queued.join(", ")}` : "queued browser sources"} for your linked machine.`,
+        `Fetching ≒JOY / NMB / Nogizaka / Gmail now${queued.length ? `; queued ${queued.join(", ")} for your linked machine` : ""}.`,
       );
     } catch (error) {
       setSyncNote(error instanceof Error ? error.message : "Sync failed.");
@@ -143,7 +143,7 @@ export function InboxView({
               className="btn btn-secondary"
               disabled={syncing}
               onClick={() => void runSync()}
-              title={syncNote ?? "Pull Weverse / Nogizaka via your linked collector"}
+              title={syncNote ?? "Fetch ≒JOY / NMB / Nogizaka now; queue Weverse for your linked collector"}
             >
               {syncing ? "Syncing…" : "Sync apps"}
             </button>

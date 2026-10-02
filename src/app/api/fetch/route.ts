@@ -3,20 +3,23 @@ import { after, NextResponse } from "next/server";
 import type { NormalizedMessage } from "@/lib/ingest";
 import { allRoomIds, collectRooms, isConfigured as cosmConfigured } from "@/lib/server/cosm";
 import { collectCircles, isConfigured as bstageConfigured } from "@/lib/server/bstage";
+import { collectNogizaka, isConfigured as nogizakaConfigured } from "@/lib/server/nogizaka";
 import { ingestBatch } from "@/lib/server/ingest";
 import { eagerTranslate, runTranslation } from "@/lib/server/pipeline";
 
 /**
  * On-demand fetch for the pure-REST sources (behind the app's passphrase gate).
  *
- * COSM (=LOVE/≠ME/≒JOY) and b.stage (NMB48 POP) run server-side (no browser).
+ * COSM (=LOVE/≠ME/≒JOY), b.stage (NMB48 POP) and Nogizaka mobame run server-side
+ * (no browser).
  *   { key: "cosm:46" }         → that COSM room
  *   { key: "bstage:<circle>" }  → that b.stage member's latest POP message
+ *   { key: "nogizaka" }         → new Nogizaka mail across your subscribed members
  *   {}                          → every configured source (Fetch all)
  *
  * Sources are collected independently: one source erroring (e.g. an upstream
  * WAF 403) never blocks the others — its error is reported alongside whatever
- * did come through. Browser sources (Weverse/Nogizaka) live in the collector.
+ * did come through. Weverse still needs the collector (a real logged-in browser).
  */
 
 export const runtime = "nodejs";
@@ -44,15 +47,25 @@ export async function POST(request: Request) {
       errors.push(`bstage: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
+  async function collectNogi(): Promise<void> {
+    try {
+      messages.push(...(await collectNogizaka()));
+    } catch (error) {
+      errors.push(`nogizaka: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
 
   if (key?.startsWith("cosm:")) {
     const roomId = Number(key.slice("cosm:".length));
     if (Number.isInteger(roomId)) await collectCosmRooms([roomId]);
   } else if (key?.startsWith("bstage:")) {
     await collectBstage([key.slice("bstage:".length)]);
+  } else if (key === "nogizaka") {
+    await collectNogi();
   } else if (!key) {
     if (cosmConfigured()) await collectCosmRooms(allRoomIds());
     if (bstageConfigured()) await collectBstage();
+    if (nogizakaConfigured()) await collectNogi();
   }
 
   // Only hard-fail when nothing came through at all and something errored.
