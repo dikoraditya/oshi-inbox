@@ -497,21 +497,33 @@ export async function ingestListenedSenders(opts?: {
   const window = opts?.newerThanDays ?? 7;
   const q = `from:(${addresses.join(" OR ")}) newer_than:${window}d`;
 
-  const { data } = await gmail.users.messages.list({
-    userId: "me",
-    q,
-    maxResults: opts?.max ?? 50,
-  });
+  const limit = opts?.max ?? 50;
 
+  // Page through the whole result set. A single list call caps at 500 results,
+  // so without pagination a sender (or roster) with more history than one page
+  // is silently truncated — the newest page is pulled and the rest never seen.
   const inserted: Message[] = [];
-  for (const message of data.messages ?? []) {
-    if (!message.id) continue;
-    try {
-      const stored = await ingestOne(gmail, message.id);
-      if (stored) inserted.push(stored);
-    } catch (error) {
-      console.error(`[gmail] listen ingest failed ${message.id}`, error);
+  let scanned = 0;
+  let pageToken: string | undefined;
+  do {
+    const { data } = await gmail.users.messages.list({
+      userId: "me",
+      q,
+      maxResults: Math.min(500, limit - scanned),
+      pageToken,
+    });
+    for (const message of data.messages ?? []) {
+      if (!message.id) continue;
+      scanned += 1;
+      try {
+        const stored = await ingestOne(gmail, message.id);
+        if (stored) inserted.push(stored);
+      } catch (error) {
+        console.error(`[gmail] listen ingest failed ${message.id}`, error);
+      }
+      if (scanned >= limit) break;
     }
-  }
-  return { inserted, scanned: data.messages?.length ?? 0, usedFallback: false };
+    pageToken = data.nextPageToken ?? undefined;
+  } while (pageToken && scanned < limit);
+  return { inserted, scanned, usedFallback: false };
 }
