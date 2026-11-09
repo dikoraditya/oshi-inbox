@@ -754,11 +754,11 @@ button {
 
 .sent-jp {
   font-family: var(--font-jp);
-  font-size: 16px;
+  font-size: calc(16px * var(--read-scale, 1));
   line-height: 1.75;
 }
 .sent-ro {
-  font-size: 13px;
+  font-size: calc(13px * var(--read-scale, 1));
   line-height: 1.55;
   letter-spacing: 0.01em;
   color: var(--color-neutral-700);
@@ -767,7 +767,7 @@ button {
   color: var(--color-accent-800);
 }
 .sent-en {
-  font-size: 14px;
+  font-size: calc(14px * var(--read-scale, 1));
   line-height: 1.55;
 }
 .sent[data-active="true"] .sent-en {
@@ -821,6 +821,148 @@ button {
   font-family: var(--font-body);
   font-size: 13px;
   line-height: 1.35;
+}
+
+/* ── Furigana ruby — romaji reading sits above a glossed word ──────────────── */
+.word ruby {
+  ruby-align: center;
+}
+.word ruby rt {
+  font-family: var(--font-body);
+  font-size: 0.52em;
+  font-weight: 500;
+  letter-spacing: 0.01em;
+  color: var(--color-neutral-700);
+  user-select: none;
+}
+
+/* ── Reading-controls bar (layout · aid · text size) ──────────────────────── */
+.readbar {
+  flex: 0 0 auto;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 16px;
+  border-bottom: 1px solid var(--color-divider);
+  background: var(--color-neutral-100);
+}
+.seg {
+  display: inline-flex;
+  border: 1px solid var(--ink-25);
+}
+.seg--size {
+  margin-left: auto;
+}
+.seg-btn {
+  font-family: var(--font-heading);
+  font-weight: 800;
+  font-size: 10px;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  background: transparent;
+  color: var(--ink-70);
+  border: 0;
+  border-right: 1px solid var(--ink-18);
+  padding: 5px 9px;
+  cursor: pointer;
+  line-height: 1.1;
+}
+.seg-btn:last-child {
+  border-right: 0;
+}
+.seg-btn:hover {
+  background: var(--hover-7);
+}
+.seg-btn[aria-pressed="true"] {
+  background: var(--color-text);
+  color: var(--color-bg);
+}
+
+/* ── Text-to-speech buttons ───────────────────────────────────────────────── */
+.speak {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.5em;
+  height: 1.5em;
+  margin-left: 6px;
+  vertical-align: middle;
+  font-size: calc(12px * var(--read-scale, 1));
+  line-height: 1;
+  background: transparent;
+  border: 1px solid var(--color-divider);
+  color: var(--ink-70);
+  cursor: pointer;
+  user-select: none;
+}
+.speak:hover {
+  background: var(--hover-7);
+  color: var(--color-text);
+}
+.speak--on {
+  background: var(--color-accent);
+  border-color: var(--color-accent);
+  color: var(--color-bg);
+}
+.act--speak {
+  letter-spacing: 0.04em;
+}
+
+/* ── Interleaved layout — one JP/romaji/EN trio per sentence ───────────────── */
+.block--trios {
+  display: flex;
+  flex-direction: column;
+}
+.trio {
+  display: grid;
+  grid-template-columns: var(--cols, 1fr);
+  gap: 8px;
+  cursor: pointer;
+  padding: 7px 0;
+}
+.trio + .trio {
+  border-top: 1px solid var(--ink-18);
+}
+.trio[data-active="true"] {
+  background: var(--color-accent-100);
+  box-shadow: -4px 0 0 var(--color-accent);
+}
+.trio-n {
+  font-family: var(--font-body);
+  font-size: 10px;
+  color: var(--ink-45);
+  text-align: right;
+  line-height: 1.9;
+}
+.trio[data-active="true"] .trio-n {
+  color: var(--color-accent-700);
+}
+.trio-body {
+  min-width: 0;
+}
+.trio-jp {
+  font-family: var(--font-jp);
+  font-size: calc(16px * var(--read-scale, 1));
+  line-height: 1.75;
+}
+.trio-ro {
+  font-size: calc(12.5px * var(--read-scale, 1));
+  line-height: 1.5;
+  letter-spacing: 0.01em;
+  color: var(--color-neutral-700);
+  margin-top: 2px;
+}
+.trio[data-active="true"] .trio-ro {
+  color: var(--color-accent-800);
+}
+.trio-en {
+  font-size: calc(14px * var(--read-scale, 1));
+  line-height: 1.5;
+  margin-top: 3px;
+}
+.trio[data-active="true"] .trio-en {
+  color: var(--color-accent-900);
 }
 
 .msg-note {

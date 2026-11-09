@@ -221,6 +221,7 @@ export default function Page() {
             member={activeMember}
             messages={threadMessages}
             settings={store.settings}
+            onUpdateSettings={store.updateSettings}
             onBack={() => setView("inbox")}
             onEdit={(messageId) => openEditor(messageId)}
             onRetry={(messageId) => void store.retranslate(messageId)}

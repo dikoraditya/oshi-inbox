@@ -125,17 +125,38 @@ export interface LearnCard {
   due: number;
 }
 
-/** User-tunable reading settings — the two props the design canvas exposed. */
+/** Stacked JP/romaji/EN blocks, or one interleaved trio per sentence. */
+export type ReadingLayout = "stacked" | "interleaved";
+
+/**
+ * In-line reading help over the Japanese:
+ * - `romaji`   — a full romaji block/line (the design default).
+ * - `furigana` — romaji rendered as ruby above each glossed word; no romaji block.
+ *                (Readings come from the gloss data we have — kana isn't stored yet.)
+ * - `kanji`    — no reading aid; tap a word for its gloss.
+ */
+export type ReadingAid = "romaji" | "furigana" | "kanji";
+
+/** User-tunable reading settings. */
 export interface Settings {
   /** Show the English block without being asked. Design default: false. */
   englishByDefault: boolean;
   /** How many sentences a long message clamps to. Design default: 2. */
   collapsedSentences: number;
+  /** Block layout vs. per-sentence interleaving. Design default: stacked. */
+  readingLayout: ReadingLayout;
+  /** How much reading help sits over the Japanese. Design default: romaji. */
+  readingAid: ReadingAid;
+  /** Multiplier on the Japanese reading font size. 1 = design default. */
+  fontScale: number;
 }
 
 export const DEFAULT_SETTINGS: Settings = {
   englishByDefault: false,
   collapsedSentences: 2,
+  readingLayout: "stacked",
+  readingAid: "romaji",
+  fontScale: 1,
 };
 
 /** What the translator route returns for one message. */

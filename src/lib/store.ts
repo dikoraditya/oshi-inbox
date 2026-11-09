@@ -42,6 +42,9 @@ export interface CosmFetchSummary {
 /** The design's rule: past this length a message clamps in the reading view. */
 const LONG_THRESHOLD = 90;
 
+/** localStorage key for the per-device reading preferences. */
+const SETTINGS_KEY = "oshi_reading_settings";
+
 /** How often to look for newly ingested mail while the tab is in front. */
 const POLL_MS = 60_000;
 
@@ -71,6 +74,18 @@ export function useInbox() {
   /** Group names, in display order. Server-owned — the Roster screen adds to them. */
   const [groups, setGroups] = useState<string[]>([]);
   const [settings, setSettings] = useState<Settings>(DEFAULT_SETTINGS);
+
+  // Reading settings are a per-device preference, not server state — persist
+  // them locally. Hydrate after mount (not in the initializer) so server and
+  // first client render agree and React doesn't warn about a mismatch.
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(SETTINGS_KEY);
+      if (raw) setSettings((current) => ({ ...current, ...JSON.parse(raw) }));
+    } catch {
+      /* corrupt or unavailable storage — keep defaults */
+    }
+  }, []);
 
   /** Guards against overlapping refreshes from poll + focus + manual sync. */
   const refreshing = useRef(false);
@@ -404,7 +419,15 @@ export function useInbox() {
   }, []);
 
   const updateSettings = useCallback((patch: Partial<Settings>) => {
-    setSettings((current) => ({ ...current, ...patch }));
+    setSettings((current) => {
+      const next = { ...current, ...patch };
+      try {
+        localStorage.setItem(SETTINGS_KEY, JSON.stringify(next));
+      } catch {
+        /* storage unavailable — the in-memory value still applies this session */
+      }
+      return next;
+    });
   }, []);
 
   return {
