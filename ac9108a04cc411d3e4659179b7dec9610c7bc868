@@ -1,0 +1,36 @@
+src/components/ThreadView.tsx
+  s_b10a474f5ac3e9::t_ff5dae7f51bfc6 6-7,14-21,24-132,178-262,295,317-323,326-350,371-461,493-496,514,527,572-573,618-621,660,665
+src/app/globals.css
+  s_b10a474f5ac3e9::t_6a8bc8f14ec07f 757,761,770
+  s_b10a474f5ac3e9::t_c3924716f7d46e 826-967
+src/lib/types.ts
+  s_b10a474f5ac3e9::t_af63f1585133fa 128-140,146-151,157-159
+src/lib/speech.ts
+  s_b10a474f5ac3e9::t_e5a917e2801e00 1-77
+src/app/page.tsx
+  s_b10a474f5ac3e9::t_6b58d31b3ece83 224
+src/lib/store.ts
+  s_b10a474f5ac3e9::t_39dea7648ff3ec 422-430
+  s_b10a474f5ac3e9::t_5ee2d8c71a81de 45-47
+  s_b10a474f5ac3e9::t_5ac659408d0cb6 78-89
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.23",
+  "base_commit_sha": "ac9108a04cc411d3e4659179b7dec9610c7bc868",
+  "prompts": {
+    "b10a474f5ac3e9d0": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "89015963-854e-438e-99b5-2a403657dd40",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Diko Raditya <diko.raditya@gdn-commerce.com>",
+      "messages": [],
+      "total_additions": 619,
+      "total_deletions": 124,
+      "accepted_lines": 0,
+      "overriden_lines": 0
+    }
+  }
+}
